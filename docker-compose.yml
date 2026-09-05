@@ -1,0 +1,14 @@
+services:
+  house-radar:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/data
+    environment:
+      HR_DATA_DIR: /data
+      HR_DAILY_RUN_HOUR: 7
+      HR_TIMEZONE: Europe/Madrid
+      HR_DELAY_SECONDS: 5
+      HR_MAX_PAGES_PER_RUN: 5
+    restart: unless-stopped

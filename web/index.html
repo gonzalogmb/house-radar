@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>House Radar</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header>
+      <h1>House Radar</h1>
+      <p id="meta-line" class="muted">cargando…</p>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab active" data-tab="searches">Búsquedas</button>
+      <button class="tab" data-tab="listings">Resultados</button>
+      <button class="tab" data-tab="runs">Ejecuciones</button>
+    </nav>
+
+    <main>
+      <section id="tab-searches" class="panel">
+        <form id="search-form" class="card">
+          <h2>Nueva búsqueda</h2>
+          <div class="grid">
+            <label>Nombre<input name="name" required placeholder="Pisos Chamberí" /></label>
+            <label>Ubicación<select name="location" id="location-select"></select></label>
+            <label>Operación
+              <select name="operation">
+                <option value="venta">Venta</option>
+                <option value="alquiler">Alquiler</option>
+              </select>
+            </label>
+            <label>Precio mín. (€)<input name="min_price" type="number" min="0" step="1000" /></label>
+            <label>Precio máx. (€)<input name="max_price" type="number" min="0" step="1000" /></label>
+            <label>Habitaciones mín.<input name="min_rooms" type="number" min="0" max="10" /></label>
+            <label>Superficie mín. (m²)<input name="min_surface" type="number" min="0" step="5" /></label>
+            <label>Páginas máx.<input name="max_pages" type="number" min="1" max="20" placeholder="por defecto 5" /></label>
+          </div>
+          <fieldset id="portals-field">
+            <legend>Portales</legend>
+          </fieldset>
+          <div class="actions">
+            <button type="submit" class="primary">Guardar búsqueda</button>
+            <button type="button" id="run-now">Lanzar ahora sin guardar</button>
+          </div>
+          <p id="form-msg" class="muted"></p>
+        </form>
+
+        <div class="card">
+          <h2>Búsquedas guardadas</h2>
+          <div id="searches-list"></div>
+        </div>
+      </section>
+
+      <section id="tab-listings" class="panel hidden">
+        <div class="card">
+          <div class="filters">
+            <label>Portal<select id="f-portal"><option value="">todos</option></select></label>
+            <label>Precio máx.<input id="f-max-price" type="number" step="10000" /></label>
+            <label>Hab. mín.<input id="f-min-rooms" type="number" min="0" max="10" /></label>
+            <label>m² mín.<input id="f-min-surface" type="number" step="5" /></label>
+            <label>Ordenar por
+              <select id="f-order">
+                <option value="scraped_at">Fecha de scraping</option>
+                <option value="published_at">Fecha de publicación</option>
+                <option value="price">Precio</option>
+                <option value="price_per_m2">€/m²</option>
+                <option value="surface_m2">Superficie</option>
+              </select>
+            </label>
+            <label class="checkbox"><input id="f-asc" type="checkbox" /> Ascendente</label>
+            <button id="apply-filters" class="primary">Aplicar</button>
+          </div>
+          <p id="listings-count" class="muted"></p>
+          <div class="table-wrap">
+            <table id="listings-table">
+              <thead>
+                <tr>
+                  <th>Portal</th><th>Anuncio</th><th>Precio</th><th>€/m²</th>
+                  <th>Hab.</th><th>m²</th><th>Zona</th><th>Anunciante</th><th>Visto</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <section id="tab-runs" class="panel hidden">
+        <div class="card">
+          <h2>Ejecuciones recientes</h2>
+          <div id="runs-list"></div>
+        </div>
+      </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+  </body>
+</html>
