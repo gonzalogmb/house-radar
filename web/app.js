@@ -86,6 +86,14 @@ async function loadMeta() {
 
   el("f-portal").innerHTML =
     '<option value="">Todos</option>' + state.portals.map((p) => `<option value="${p}">${p}</option>`).join("");
+
+  if (state.meta.public_demo) {
+    el("demo-banner").classList.remove("hidden");
+    document.querySelectorAll('#search-form button[type="submit"], #run-now').forEach((button) => {
+      button.disabled = true;
+      button.title = "Desactivado en la demo pública";
+    });
+  }
 }
 
 async function renderKpis() {
@@ -194,10 +202,14 @@ async function renderSearches() {
             search.last_run_at ? relative(search.last_run_at) : "nunca"
           }</span>
         </div>
-        <div class="actions">
+        ${
+          state.meta.public_demo
+            ? ""
+            : `<div class="actions">
           <button class="btn primary small" data-run="${search.id}">Lanzar</button>
           <button class="btn danger small ghost" data-delete="${search.id}">Borrar</button>
-        </div>
+        </div>`
+        }
       </div>`;
     })
     .join("");

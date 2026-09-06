@@ -41,6 +41,34 @@ docker compose up --build
 
 Los datos persisten en `./data`, montado como volumen.
 
+### Desplegar en Render (demo pública de solo lectura)
+
+El repo incluye [render.yaml](render.yaml) para desplegar como Blueprint:
+
+1. Render → New → Blueprint → apunta a este repo. Necesita un plan **de pago**
+   ("Starter") con disco, no el gratuito: el free tier no tiene disco persistente
+   (los datos desaparecerían en cada reinicio) y se duerme a los 15 min de
+   inactividad, lo que se saltaría el run diario en silencio mientras duerme.
+2. En el dashboard del servicio, define `HR_ADMIN_TOKEN` (un secreto tuyo — te
+   deja crear/lanzar/borrar búsquedas de forma remota mandando la cabecera
+   `X-Admin-Token`, sin ese token esas acciones quedan bloqueadas para todo el
+   mundo). Opcionalmente `HR_IDEALISTA_API_KEY`/`SECRET` si quieres incluir
+   idealista.
+3. Añade un registro DNS en tu dominio apuntando al host `*.onrender.com` que te
+   dé Render (Render te indica exactamente cuál cuando configuras el dominio
+   personalizado en el servicio) — por ejemplo un `CNAME` de
+   `radar.gonzalomartinezberzal.com`. Ese paso lo haces tú en tu proveedor DNS.
+4. Crea al menos una búsqueda guardada con `HR_ADMIN_TOKEN` (por ejemplo con
+   `curl -H "X-Admin-Token: ..." -d '{...}' https://tu-servicio/api/searches`)
+   para que el run diario tenga algo que ejecutar — sin ninguna búsqueda
+   guardada, la demo se queda vacía hasta que crees una.
+
+Con `HR_PUBLIC_DEMO=true` (ya en el `render.yaml`), cualquier visitante puede
+explorar `Resultados` y `Ejecuciones` pero no puede crear, lanzar ni borrar
+búsquedas — evita que un desconocido dispare scraping contra los portales
+reales, o gaste tu cuota de la API de idealista, desde tu web pública. El run
+diario programado no se ve afectado: corre igual, lo dispares tú o no.
+
 ## Uso
 
 - **Búsquedas**: defines ubicación, operación, precio, habitaciones, superficie y portales.

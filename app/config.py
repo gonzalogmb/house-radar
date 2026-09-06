@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     idealista_api_key: str | None = None
     idealista_api_secret: str | None = None
 
+    # When true, anyone hitting the public deployment can browse listings/runs but
+    # cannot create, run, or delete searches — the internal daily scheduler still
+    # does that. admin_token reopens those endpoints for whoever holds the secret
+    # (sent as the X-Admin-Token header), so the owner can still manage searches
+    # remotely without redeploying. Leaving admin_token unset while public_demo is
+    # true locks those endpoints for everyone, owner included but for shell access.
+    public_demo: bool = False
+    admin_token: str | None = None
+
     # Hour of day (0-23) for the daily run of every saved search. -1 disables it.
     daily_run_hour: int = 7
     timezone: str = "Europe/Madrid"

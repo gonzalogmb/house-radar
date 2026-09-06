@@ -470,6 +470,25 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .delta-down { color: var(--ok); font-weight: 600; }
 .delta-up { color: var(--warn); font-weight: 600; }
 
+.demo-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin: 14px 24px 0;
+  padding: 10px 16px;
+  background: var(--warn-soft);
+  border: 1px solid var(--warn);
+  border-radius: 10px;
+  color: var(--text);
+  font-size: 13px;
+  text-align: center;
+}
+
+.demo-banner a { color: var(--accent); font-weight: 600; text-decoration: none; white-space: nowrap; }
+.demo-banner a:hover { text-decoration: underline; }
+
 .toasts { position: fixed; bottom: 20px; right: 20px; display: flex; flex-direction: column; gap: 10px; z-index: 50; }
 
 .toast {

@@ -10,8 +10,11 @@ COPY app ./app
 COPY web ./web
 
 ENV HR_DATA_DIR=/data \
-    PYTHONUNBUFFERED=1
+    PYTHONUNBUFFERED=1 \
+    PORT=8000
 VOLUME ["/data"]
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Shell form so $PORT expands — Render (and most PaaS hosts) inject their own port
+# and expect the container to bind to it instead of a fixed one.
+CMD uvicorn app.main:app --host 0.0.0.0 --port ${PORT}

@@ -1,0 +1,44 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+#
+# Deploy: Render dashboard -> New -> Blueprint -> point at this repo.
+# Render reads this file and creates the service below; you still set the
+# secret-marked env vars (sync: false) by hand in its dashboard afterwards.
+#
+# Needs a paid instance, not the free tier: the free plan has no persistent
+# disk (the scraped listings and price history would vanish on every restart
+# or deploy) and sleeps after 15 minutes of inactivity (which would silently
+# skip the daily scrape while asleep). A "Starter" instance plus a small disk
+# is the realistic minimum for this to work as a real, daily-refreshing demo.
+services:
+  - type: web
+    name: house-radar
+    runtime: docker
+    plan: starter
+    healthCheckPath: /api/meta
+    disk:
+      name: house-radar-data
+      mountPath: /data
+      sizeGB: 1
+    envVars:
+      - key: HR_DATA_DIR
+        value: /data
+      - key: HR_PUBLIC_DEMO
+        value: "true"
+      - key: HR_ADMIN_TOKEN
+        sync: false # set your own secret here to manage searches remotely (X-Admin-Token header)
+      - key: HR_DAILY_RUN_HOUR
+        value: "7"
+      - key: HR_TIMEZONE
+        value: Europe/Madrid
+      - key: HR_DELAY_SECONDS
+        value: "6"
+      - key: HR_MAX_PAGES_PER_RUN
+        value: "3" # keep the Starter instance's memory/CPU budget comfortable
+      # Optional: add these to include idealista via its official API. Without
+      # them, idealista falls back to HTML scraping, which is blocked by its
+      # bot wall (DataDome) and just burns a Chromium launch on every attempt —
+      # leave idealista out of the demo's saved searches until these are set.
+      - key: HR_IDEALISTA_API_KEY
+        sync: false
+      - key: HR_IDEALISTA_API_SECRET
+        sync: false

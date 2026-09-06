@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -50,6 +50,21 @@ class SearchPayload(BaseModel):
     criteria: SearchCriteria
 
 
+def require_admin(x_admin_token: str | None = Header(default=None)) -> None:
+    """Gate for anything that creates, runs, or deletes a search.
+
+    The internal daily scheduler calls job_manager directly and never goes through
+    this dependency, so it keeps working regardless. This only blocks the HTTP
+    endpoints a public visitor could otherwise use to make this server scrape
+    on their behalf.
+    """
+    settings = get_settings()
+    if not settings.public_demo:
+        return
+    if not settings.admin_token or x_admin_token != settings.admin_token:
+        raise HTTPException(403, "read-only demo: this action needs the admin token")
+
+
 @app.get("/")
 async def index() -> FileResponse:
     return FileResponse(WEB_DIR / "index.html")
@@ -66,6 +81,7 @@ async def meta() -> dict:
         "max_pages_per_run": settings.max_pages_per_run,
         "delay_seconds": settings.delay_seconds,
         "active_runs": job_manager.active_count(),
+        "public_demo": settings.public_demo,
     }
 
 
@@ -74,7 +90,7 @@ async def list_searches() -> list[SavedSearch]:
     return load_searches()
 
 
-@app.post("/api/searches")
+@app.post("/api/searches", dependencies=[Depends(require_admin)])
 async def create_search(payload: SearchPayload) -> SavedSearch:
     search = SavedSearch(
         id=uuid.uuid4().hex[:12],
@@ -85,14 +101,14 @@ async def create_search(payload: SearchPayload) -> SavedSearch:
     return save_search(search)
 
 
-@app.delete("/api/searches/{search_id}")
+@app.delete("/api/searches/{search_id}", dependencies=[Depends(require_admin)])
 async def remove_search(search_id: str) -> dict:
     if not delete_search(search_id):
         raise HTTPException(404, "search not found")
     return {"deleted": search_id}
 
 
-@app.post("/api/searches/{search_id}/run")
+@app.post("/api/searches/{search_id}/run", dependencies=[Depends(require_admin)])
 async def run_search(search_id: str) -> RunRecord:
     search = next((s for s in load_searches() if s.id == search_id), None)
     if search is None:
@@ -100,7 +116,7 @@ async def run_search(search_id: str) -> RunRecord:
     return job_manager.launch(search.criteria, search.name, search.id)
 
 
-@app.post("/api/runs")
+@app.post("/api/runs", dependencies=[Depends(require_admin)])
 async def run_adhoc(payload: SearchPayload) -> RunRecord:
     return job_manager.launch(payload.criteria, payload.name)
 
