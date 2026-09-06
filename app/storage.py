@@ -118,10 +118,14 @@ def load_listings(
     return frame
 
 
-def load_listings_enriched(portal: str | None = None, search_id: str | None = None) -> pd.DataFrame:
+def enrich_history(history: pd.DataFrame, search_id: str | None = None) -> pd.DataFrame:
     """Latest snapshot per listing plus what only the history can tell: when it first
-    showed up and how the price moved since the previous run."""
-    history = load_listings(portal=portal, latest_only=False)
+    showed up and how the price moved since the previous run.
+
+    Shared by the live app (`load_listings_enriched`, reading from data/listings/) and
+    the static-export pipeline (which keeps its own accumulated history file) so both
+    compute "new" and "price drop" the same way.
+    """
     if history.empty:
         return history
 
@@ -148,6 +152,10 @@ def load_listings_enriched(portal: str | None = None, search_id: str | None = No
     if search_id:
         frame = frame[frame["search_id"] == search_id]
     return frame.reset_index(drop=True)
+
+
+def load_listings_enriched(portal: str | None = None, search_id: str | None = None) -> pd.DataFrame:
+    return enrich_history(load_listings(portal=portal, latest_only=False), search_id=search_id)
 
 
 def price_history(portal: str, listing_id: str) -> pd.DataFrame:
@@ -184,6 +192,37 @@ def diff_against_history(listings: list[Listing]) -> tuple[set[str], list[dict]]
                 }
             )
     return new_ids, drops
+
+
+def neighborhood_facets(frame: pd.DataFrame) -> list[dict]:
+    """Neighbourhoods present in the data, with their district for grouping and a count."""
+    known = frame[frame["neighborhood"].notna() & (frame["neighborhood"] != "")]
+    if known.empty:
+        return []
+    grouped = (
+        known.assign(group=known["district"].fillna(known["city"]).fillna("Otros"))
+        .groupby(["group", "neighborhood"])
+        .size()
+        .reset_index(name="count")
+        .sort_values(["group", "count"], ascending=[True, False])
+    )
+    return grouped.to_dict("records")
+
+
+def frame_to_records(frame: pd.DataFrame) -> list[dict]:
+    """DataFrame -> JSON-safe list of dicts, with datetime columns as ISO strings."""
+    frame = frame.copy()
+    for column in frame.select_dtypes(include=["datetimetz", "datetime64[ns]"]).columns:
+        frame[column] = frame[column].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return json.loads(frame.to_json(orient="records"))
+
+
+def safe_float(value) -> float | None:
+    return None if pd.isna(value) else round(float(value), 2)
+
+
+def safe_iso(value) -> str | None:
+    return None if pd.isna(value) else value.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _partition_date(path: Path) -> date | None:

@@ -1,11 +1,9 @@
-import json
 import logging
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 
-import pandas as pd
 from fastapi import Depends, FastAPI, Header, HTTPException, Query
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -19,10 +17,14 @@ from app.scheduler import build_scheduler
 from app.scrapers import PORTALS, scraper_for
 from app.storage import (
     delete_search,
+    frame_to_records,
     load_listings_enriched,
     load_runs,
     load_searches,
+    neighborhood_facets,
     price_history,
+    safe_float,
+    safe_iso,
     save_search,
 )
 
@@ -174,19 +176,19 @@ async def list_listings(
 
     # Facets come from everything the other filters allow, so picking a neighbourhood
     # never empties the dropdown that offered it.
-    facets = {"neighborhoods": _neighborhood_facets(frame)}
+    facets = {"neighborhoods": neighborhood_facets(frame)}
     if neighborhood:
         frame = frame[frame["neighborhood"] == neighborhood]
 
     matched = len(frame)
     frame = frame.sort_values(order_by, ascending=ascending, na_position="last").head(limit)
-    return {"total": total, "matched": matched, "items": _to_records(frame), "facets": facets}
+    return {"total": total, "matched": matched, "items": frame_to_records(frame), "facets": facets}
 
 
 @app.get("/api/listings/{portal}/{listing_id}/history")
 async def listing_history(portal: str, listing_id: str) -> dict:
     frame = price_history(portal, listing_id)
-    return {"points": _to_records(frame)}
+    return {"points": frame_to_records(frame)}
 
 
 @app.get("/api/stats")
@@ -199,37 +201,7 @@ async def stats() -> dict:
         "by_portal": frame["portal"].value_counts().to_dict(),
         "new_listings": int(frame["is_new"].sum()),
         "price_drops": int((frame["price_delta"] < 0).sum()),
-        "median_price": _safe_float(frame["price"].median()),
-        "median_price_per_m2": _safe_float(frame["price_per_m2"].median()),
-        "last_scrape": _safe_iso(frame["scraped_at"].max()),
+        "median_price": safe_float(frame["price"].median()),
+        "median_price_per_m2": safe_float(frame["price_per_m2"].median()),
+        "last_scrape": safe_iso(frame["scraped_at"].max()),
     }
-
-
-def _neighborhood_facets(frame: pd.DataFrame) -> list[dict]:
-    """Neighbourhoods present in the data, with their district for grouping and a count."""
-    known = frame[frame["neighborhood"].notna() & (frame["neighborhood"] != "")]
-    if known.empty:
-        return []
-    grouped = (
-        known.assign(group=known["district"].fillna(known["city"]).fillna("Otros"))
-        .groupby(["group", "neighborhood"])
-        .size()
-        .reset_index(name="count")
-        .sort_values(["group", "count"], ascending=[True, False])
-    )
-    return grouped.to_dict("records")
-
-
-def _to_records(frame: pd.DataFrame) -> list[dict]:
-    frame = frame.copy()
-    for column in frame.select_dtypes(include=["datetimetz", "datetime64[ns]"]).columns:
-        frame[column] = frame[column].dt.strftime("%Y-%m-%dT%H:%M:%SZ")
-    return json.loads(frame.to_json(orient="records"))
-
-
-def _safe_float(value) -> float | None:
-    return None if pd.isna(value) else round(float(value), 2)
-
-
-def _safe_iso(value) -> str | None:
-    return None if pd.isna(value) else value.strftime("%Y-%m-%dT%H:%M:%SZ")

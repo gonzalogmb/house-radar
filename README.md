@@ -41,7 +41,52 @@ docker compose up --build
 
 Los datos persisten en `./data`, montado como volumen.
 
-### Desplegar en Render (demo pública de solo lectura)
+### Demo pública gratuita (GitHub Pages + Actions)
+
+Esta es la que está enlazada desde el portfolio. No hay servidor corriendo en
+ningún sitio ni factura de por medio:
+
+- [`.github/workflows/daily-scrape.yml`](.github/workflows/daily-scrape.yml) corre una
+  vez al día (gratis, `workflow_dispatch` para lanzarlo también a mano), scrapea las
+  búsquedas de [`site/searches.json`](site/searches.json), acumula el histórico en
+  `site/history.parquet` (committeado — un runner de Actions no persiste nada entre
+  ejecuciones, así que el histórico vive en el propio repo) y escribe
+  [`docs/data.json`](docs/data.json).
+- `docs/` es una página estática (sin FastAPI, sin Python en el navegador) que lee ese
+  JSON y filtra/ordena en el cliente. La sirve GitHub Pages: gratis para siempre, no se
+  duerme, no tiene disco que pagar.
+- Por diseño no hay pestaña de Ejecuciones en vivo ni forma de lanzar un scrape desde
+  la web: los datos se refrescan una vez al día vía Actions, igual de frescos que el
+  run diario del servidor completo, solo que no hay nada corriendo entre medias que
+  alguien pueda abusar.
+
+Puesta en marcha (una sola vez):
+
+1. Repo → **Settings → Pages** → Source: rama `main`, carpeta `/docs`.
+2. Repo → **Settings → Pages → Custom domain**: `radar.gonzalomartinezberzal.com`
+   (ya está el archivo `docs/CNAME` con ese valor). Marca **Enforce HTTPS** en cuanto
+   se active la opción.
+3. En tu proveedor DNS de `gonzalomartinezberzal.com`, añade un `CNAME`:
+   `radar` → `gonzalogmb.github.io`.
+4. Opcional: si tienes clave de idealista, añádela como secretos del repo
+   (**Settings → Secrets and variables → Actions**) `HR_IDEALISTA_API_KEY` /
+   `HR_IDEALISTA_API_SECRET`, y añade `"idealista"` a `portals` +
+   `"idealista": "madrid-madrid"` en `location_slugs` dentro de
+   `site/searches.json`. Sin esas claves, no añadas idealista ahí: caería al scraper
+   HTML, que necesita Playwright (deliberadamente no instalado en el workflow para
+   mantenerlo ligero) y de todos modos lo bloquea DataDome.
+5. Para editar qué se scrapea (ciudad, precio, habitaciones...), edita
+   `site/searches.json` — es una lista de `{name, criteria}` con la misma forma que
+   `SearchCriteria` (ver `app/models.py`).
+
+### Desplegar en Render (app completa e interactiva, de pago)
+
+Alternativa a la anterior, no además: usa esto solo si más adelante quieres cambiar
+la instantánea estática por la aplicación completa funcionando en vivo (crear/lanzar
+búsquedas desde la web, pestaña de Ejecuciones en tiempo real) — para eso hace falta
+un servidor real corriendo, y eso sí tiene coste. El registro DNS de
+`radar.gonzalomartinezberzal.com` solo puede apuntar a un sitio a la vez, así que
+esto significaría repuntarlo desde GitHub Pages hacia Render.
 
 El repo incluye [render.yaml](render.yaml) para desplegar como Blueprint:
 

@@ -1,0 +1,47 @@
+name: Daily scrape (static demo)
+
+on:
+  schedule:
+    # 06:00 UTC ≈ 07:00/08:00 Madrid depending on DST. Cron always runs in UTC.
+    - cron: "0 6 * * *"
+  workflow_dispatch: {} # lets you trigger it by hand from the Actions tab
+
+permissions:
+  contents: write # needed to commit site/history.parquet and docs/data.json back
+
+concurrency:
+  group: daily-scrape
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Deliberately NOT installing Playwright's browser here: the demo only scrapes
+      # fotocasa + pisos.com (plain HTTP, see site/searches.json), and idealista's own
+      # HTML site is blocked by DataDome regardless — a browser would just fail slower.
+      # If you add idealista via its official API (HR_IDEALISTA_API_KEY/SECRET repo
+      # secrets), that scraper is httpx-only too, so no browser is needed either way.
+      - run: pip install -r requirements.txt
+
+      # A broken selector shouldn't block publishing whatever the other portal(s) got —
+      # this step's own failure still shows red in the Actions tab as a signal to fix it.
+      - run: python -m app.export_static
+        continue-on-error: true
+        env:
+          HR_IDEALISTA_API_KEY: ${{ secrets.HR_IDEALISTA_API_KEY }}
+          HR_IDEALISTA_API_SECRET: ${{ secrets.HR_IDEALISTA_API_SECRET }}
+
+      - name: Commit updated data
+        run: |
+          git config user.name "house-radar-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add site/history.parquet docs/data.json
+          git diff --staged --quiet && echo "no changes" || git commit -m "Daily scrape $(date -u +%Y-%m-%d)"
+          git push

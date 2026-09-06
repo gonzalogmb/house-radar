@@ -1,0 +1,15 @@
+[
+  {
+    "name": "Madrid capital",
+    "criteria": {
+      "location_name": "Madrid capital",
+      "location_slugs": { "fotocasa": "madrid-capital", "pisos": "madrid_capital" },
+      "center": "40.4168,-3.7038",
+      "operation": "venta",
+      "portals": ["fotocasa", "pisos"],
+      "max_price": 500000,
+      "min_rooms": 1,
+      "max_pages": 3
+    }
+  }
+]
