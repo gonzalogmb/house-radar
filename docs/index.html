@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>House Radar — demo</title>
     <link rel="stylesheet" href="styles.css" />
+    <script src="https://accounts.google.com/gsi/client"></script>
   </head>
   <body>
     <header class="topbar">
@@ -28,13 +29,27 @@
     <section id="kpis" class="kpis"></section>
 
     <div class="info-banner">
-      <span>📸 Sin servidor propio: guardar/lanzar búsquedas escribe directamente en este repositorio vía la API de GitHub, con tu propio token.</span>
+      <span>📸 Sin servidor propio: guardar/lanzar/borrar búsquedas pasa por una función serverless que verifica tu inicio de sesión de Google antes de tocar el repositorio.</span>
       <a href="https://github.com/gonzalogmb/house-radar" target="_blank" rel="noopener">Ver el código →</a>
     </div>
 
     <main>
       <!-- ─── Búsquedas ─────────────────────────────────────────── -->
       <section id="tab-searches" class="panel hidden">
+        <div class="card auth-card">
+          <div id="auth-signed-out">
+            <p class="muted tiny">
+              Guardar, lanzar o borrar búsquedas necesita iniciar sesión como el
+              propietario del repositorio.
+            </p>
+            <div id="google-signin-button"></div>
+          </div>
+          <div id="auth-signed-in" class="hidden">
+            <span class="tiny">✓ Conectado como <b id="auth-email"></b></span>
+            <button id="auth-signout" class="link-btn" type="button">Cerrar sesión</button>
+          </div>
+        </div>
+
         <div class="two-col">
           <form id="search-form" class="card">
             <div class="card-head">
@@ -95,11 +110,7 @@
             <div class="actions">
               <button type="submit" class="btn primary">Guardar búsqueda</button>
             </div>
-            <p class="muted tiny">
-              Necesita tu token de GitHub (fine-grained, permisos <b>Contents</b> y
-              <b>Actions</b> en modo lectura y escritura, solo sobre este repositorio) —
-              te lo pedirá la primera vez.
-            </p>
+            <p class="muted tiny">Necesita haber iniciado sesión con Google arriba.</p>
           </form>
 
           <div class="card">

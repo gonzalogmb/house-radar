@@ -1,0 +1,13 @@
+name = "house-radar-gate"
+main = "worker.js"
+compatibility_date = "2025-01-01"
+
+[vars]
+# Public by nature (it's meant to be embedded in frontend code) — the real
+# secret is GITHUB_TOKEN below, set separately as a Worker secret.
+GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"
+ALLOWED_ORIGIN = "https://radar.gonzalomartinezberzal.com"
+
+# Set with: wrangler secret put GITHUB_TOKEN
+# A fine-grained PAT scoped to only this repo, with Contents: Read and write
+# and Actions: Read and write. Never put it in this file or in git.

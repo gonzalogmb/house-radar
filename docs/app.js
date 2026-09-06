@@ -55,73 +55,19 @@ const CATALOGUE = {
 };
 const PORTALS = ["idealista", "fotocasa", "pisos"];
 
-/* ── GitHub as the backend ──────────────────────────────────────────────
-   This page has none of its own. Browsing (Resultados, Ejecuciones, the
-   list of saved searches) only ever does plain unauthenticated reads —
-   GitHub allows that for a public repo, so no visitor is asked for
-   anything just to look. Only a write (guardar/lanzar/borrar) prompts for
-   a token, and only the owner's own token can actually succeed: GitHub
-   itself rejects anything else with 401/403, which the page treats the
-   same way regardless of who's asking. */
+/* ── GitHub as the backend for reads ─────────────────────────────────────
+   Browsing (Resultados, Ejecuciones, the list of saved searches) only ever
+   does plain unauthenticated reads — GitHub allows that for a public repo,
+   so no visitor is asked for anything just to look. */
 const GH_OWNER = "gonzalogmb";
 const GH_REPO = "house-radar";
 const GH_WORKFLOW = "daily-scrape.yml";
-const GH_TOKEN_KEY = "hr-gh-token";
 const GH_API = "https://api.github.com";
 const GH_HEADERS = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
 
-function getStoredToken() {
-  try {
-    return localStorage.getItem(GH_TOKEN_KEY);
-  } catch {
-    return null;
-  }
-}
-
-function setStoredToken(value) {
-  try {
-    if (value) localStorage.setItem(GH_TOKEN_KEY, value);
-    else localStorage.removeItem(GH_TOKEN_KEY);
-  } catch {
-    /* private browsing: it just won't be remembered next time */
-  }
-}
-
-function ensureToken() {
-  let token = getStoredToken();
-  if (!token) {
-    token = window.prompt(
-      "Pega un token de GitHub (fine-grained, permisos 'Contents' y 'Actions' en modo " +
-        "Read and write, solo sobre este repositorio).\n\n" +
-        "Se guarda únicamente en este navegador y se envía directamente a api.github.com.",
-    );
-    if (token) setStoredToken(token);
-  }
-  return token;
-}
-
-/** Authenticated call — used for anything that writes (save, delete, launch). */
-async function ghWrite(path, options = {}) {
-  const token = ensureToken();
-  if (!token) throw new Error("Se necesita un token de GitHub para esto.");
-  const response = await fetch(`${GH_API}${path}`, {
-    ...options,
-    headers: { ...GH_HEADERS, Authorization: `Bearer ${token}`, ...(options.headers || {}) },
-  });
-  if (response.status === 401 || response.status === 403) {
-    setStoredToken(null);
-    throw new Error("Token inválido o sin permisos suficientes en este repositorio.");
-  }
-  return response;
-}
-
-/** Plain read — no token, works for anyone on a public repo. */
+/** Plain read — no auth, works for anyone on a public repo. */
 async function ghRead(path) {
   return fetch(`${GH_API}${path}`, { headers: GH_HEADERS });
-}
-
-function utf8ToBase64(str) {
-  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
 }
 
 function base64ToUtf8(b64) {
@@ -135,38 +81,75 @@ async function readSearchesFile() {
   return { sha: data.sha, searches: JSON.parse(base64ToUtf8(data.content)) };
 }
 
-async function readSearchesFileAuthenticated() {
-  const response = await ghWrite(`/repos/${GH_OWNER}/${GH_REPO}/contents/site/searches.json?ref=main`);
-  if (!response.ok) throw new Error(`No se pudo leer site/searches.json (HTTP ${response.status})`);
-  const data = await response.json();
-  return { sha: data.sha, searches: JSON.parse(base64ToUtf8(data.content)) };
+/* ── Google Sign-In + the Worker for writes ─────────────────────────────
+   Every write (save/delete a search, launch a scrape) goes through a small
+   Cloudflare Worker instead of straight to GitHub. The Worker holds the
+   real GitHub token as a server-side secret — it never reaches this page —
+   and only acts after verifying, itself, that the Google ID token we send
+   it really was issued to gonzalomartinezberzal's own Google account. A
+   visitor who isn't signed in as that account gets nothing: the client-side
+   check below is just a friendlier error message, not the actual gate. */
+const WORKER_URL = "https://house-radar-gate.YOUR_SUBDOMAIN.workers.dev"; // set after deploying the Worker
+const GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"; // must match cf-worker/wrangler.toml
+
+let currentCredential = null;
+
+function decodeJwtPayload(token) {
+  const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
+  return JSON.parse(decodeURIComponent(escape(atob(base64))));
 }
 
-async function writeSearchesFile(searches, sha, message) {
-  const response = await ghWrite(`/repos/${GH_OWNER}/${GH_REPO}/contents/site/searches.json`, {
-    method: "PUT",
-    body: JSON.stringify({
-      message,
-      content: utf8ToBase64(JSON.stringify(searches, null, 2) + "\n"),
-      sha,
-      branch: "main",
-    }),
+function handleCredentialResponse(response) {
+  currentCredential = response.credential;
+  const { email } = decodeJwtPayload(response.credential);
+  el("auth-email").textContent = email;
+  el("auth-signed-out").classList.add("hidden");
+  el("auth-signed-in").classList.remove("hidden");
+}
+
+function signOut() {
+  currentCredential = null;
+  window.google?.accounts?.id?.disableAutoSelect();
+  el("auth-signed-in").classList.add("hidden");
+  el("auth-signed-out").classList.remove("hidden");
+}
+
+el("auth-signout").addEventListener("click", signOut);
+
+if (window.google?.accounts?.id) {
+  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleCredentialResponse });
+  google.accounts.id.renderButton(el("google-signin-button"), { theme: "filled_black", size: "medium", text: "signin" });
+}
+
+function requireSignIn() {
+  if (!currentCredential) throw new Error("Inicia sesión con Google primero.");
+  return currentCredential;
+}
+
+async function workerRequest(path, body) {
+  const response = await fetch(`${WORKER_URL}${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
   });
-  if (!response.ok) {
-    const body = await response.text();
-    throw new Error(`No se pudo guardar (HTTP ${response.status}): ${body.slice(0, 200)}`);
-  }
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+  return data;
 }
 
 async function dispatchWorkflow(searchName) {
-  const response = await ghWrite(`/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`, {
-    method: "POST",
-    body: JSON.stringify({ ref: "main", inputs: searchName ? { search_name: searchName } : {} }),
-  });
-  if (response.status !== 204) {
-    const body = await response.text();
-    throw new Error(`GitHub respondió ${response.status}: ${body.slice(0, 200)}`);
-  }
+  const credential = requireSignIn();
+  await workerRequest("/dispatch", { credential, search_name: searchName || undefined });
+}
+
+async function addSearch(search) {
+  const credential = requireSignIn();
+  await workerRequest("/searches/add", { credential, search });
+}
+
+async function deleteSearch(name) {
+  const credential = requireSignIn();
+  await workerRequest("/searches/delete", { credential, name });
 }
 
 async function readWorkflowRuns() {
@@ -514,9 +497,7 @@ el("search-form").addEventListener("submit", async (event) => {
   try {
     const payload = readSearchForm();
     submitBtn.disabled = true;
-    const { sha, searches } = await readSearchesFileAuthenticated();
-    searches.push(payload);
-    await writeSearchesFile(searches, sha, `Add search: ${payload.name}`);
+    await addSearch(payload);
     toast(`Búsqueda "${payload.name}" guardada`, "success");
     event.target.reset();
     renderSearches();
@@ -601,9 +582,7 @@ async function renderSearches() {
     button.addEventListener("click", async () => {
       button.disabled = true;
       try {
-        const { sha, searches: current } = await readSearchesFileAuthenticated();
-        const remaining = current.filter((s) => s.name !== button.dataset.delete);
-        await writeSearchesFile(remaining, sha, `Remove search: ${button.dataset.delete}`);
+        await deleteSearch(button.dataset.delete);
         toast("Búsqueda borrada", "success");
         renderSearches();
       } catch (error) {
