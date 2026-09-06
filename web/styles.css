@@ -14,6 +14,8 @@
   --warn-soft: rgba(251, 191, 36, 0.14);
   --danger: #f87171;
   --danger-soft: rgba(248, 113, 113, 0.14);
+  --sareb: #a78bfa;
+  --sareb-soft: rgba(167, 139, 250, 0.16);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.28);
   --radius: 14px;
   color-scheme: dark;
@@ -35,6 +37,8 @@
   --warn-soft: rgba(180, 116, 7, 0.12);
   --danger: #d93a3a;
   --danger-soft: rgba(217, 58, 58, 0.1);
+  --sareb: #7c3aed;
+  --sareb-soft: rgba(124, 58, 237, 0.1);
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06);
   color-scheme: light;
 }
@@ -216,6 +220,7 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .kpi-label { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .kpi.accent .kpi-value { color: var(--accent); }
 .kpi.ok .kpi-value { color: var(--ok); }
+.kpi.sareb .kpi-value { color: var(--sareb); }
 
 .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
@@ -418,6 +423,7 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .badge.new { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
 .badge.drop { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
 .badge.rise { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.badge.sareb { background: var(--sareb-soft); border-color: var(--sareb); color: var(--sareb); }
 .badge.done { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
 .badge.running, .badge.pending { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
 .badge.failed { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
@@ -432,6 +438,7 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .listing-media .badge.new { background: rgba(91, 140, 255, 0.94); border-color: transparent; color: #fff; }
 .listing-media .badge.drop { background: rgba(16, 160, 110, 0.94); border-color: transparent; color: #fff; }
 .listing-media .badge.rise { background: rgba(190, 130, 10, 0.94); border-color: transparent; color: #fff; }
+.listing-media .badge.sareb { background: rgba(124, 58, 237, 0.94); border-color: transparent; color: #fff; }
 
 .listing-body { padding: 14px 15px 15px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }

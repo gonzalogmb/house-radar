@@ -7,6 +7,7 @@ from threading import Lock
 
 import pandas as pd
 
+from app.advertiser_tags import is_sareb_related
 from app.config import get_settings
 from app.models import Listing, RunRecord, SavedSearch
 
@@ -148,6 +149,7 @@ def enrich_history(history: pd.DataFrame, search_id: str | None = None) -> pd.Da
 
     last_pass = frame["scraped_at"].max()
     frame["is_new"] = frame["first_seen"].dt.date == last_pass.date()
+    frame["is_sareb"] = frame["advertiser_name"].apply(is_sareb_related)
 
     if search_id:
         frame = frame[frame["search_id"] == search_id]

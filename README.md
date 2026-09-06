@@ -120,8 +120,14 @@ diario programado no se ve afectado: corre igual, lo dispares tú o no.
   Puedes guardarla (entra en el run diario) o lanzarla al momento.
 - **Resultados**: tarjetas con foto, precio, €/m² y zona. Los anuncios vistos por primera
   vez en la última pasada llevan distintivo **Nuevo**, y los que han cambiado de precio
-  muestran la diferencia; filtros rápidos para ver solo unos u otros. Al pulsar en el pie
-  de una tarjeta se abre su histórico de precio.
+  muestran la diferencia; filtros rápidos para ver solo unos u otros (incluye barrio con
+  selección múltiple). Al pulsar en el pie de una tarjeta se abre su histórico de precio.
+  El distintivo **🏦 Sareb** marca los anuncios cuyo anunciante coincide con una gestora
+  conocida del banco malo (Hipoges, Aliseda, Servihabitat, Aelca...) — ver
+  [`app/advertiser_tags.py`](app/advertiser_tags.py). Es una coincidencia de texto sobre
+  lo que ya se scrapea de Fotocasa/pisos.com, no un portal nuevo: la Sareb no vende
+  directamente (su web tiene hCaptcha) y esas gestoras también gestionan activos de
+  otros propietarios, así que es una señal fuerte, no una certeza.
 - **Ejecuciones**: estado en vivo de cada run, anuncios nuevos, bajadas de precio, y qué
   falló en cada portal.
 

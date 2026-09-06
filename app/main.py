@@ -150,6 +150,7 @@ async def list_listings(
     neighborhood: list[str] | None = Query(None),
     only_new: bool = False,
     only_drops: bool = False,
+    only_sareb: bool = False,
     order_by: str = Query(
         "first_seen", pattern="^(price|price_per_m2|surface_m2|scraped_at|published_at|first_seen)$"
     ),
@@ -173,6 +174,8 @@ async def list_listings(
         frame = frame[frame["is_new"]]
     if only_drops:
         frame = frame[frame["price_delta"] < 0]
+    if only_sareb:
+        frame = frame[frame["is_sareb"]]
 
     # Facets come from everything the other filters allow, so picking a neighbourhood
     # never empties the dropdown that offered it.
@@ -201,6 +204,7 @@ async def stats() -> dict:
         "by_portal": frame["portal"].value_counts().to_dict(),
         "new_listings": int(frame["is_new"].sum()),
         "price_drops": int((frame["price_delta"] < 0).sum()),
+        "sareb_listings": int(frame["is_sareb"].sum()),
         "median_price": safe_float(frame["price"].median()),
         "median_price_per_m2": safe_float(frame["price_per_m2"].median()),
         "last_scrape": safe_iso(frame["scraped_at"].max()),

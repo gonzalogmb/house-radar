@@ -197,6 +197,7 @@ async function renderKpis() {
     { value: num(stats.total_listings), label: "anuncios seguidos" },
     { value: num(stats.new_listings), label: "nuevos en la última pasada", cls: "accent" },
     { value: num(stats.price_drops), label: "con bajada de precio", cls: "ok" },
+    { value: num(stats.sareb_listings), label: "de la Sareb", cls: "sareb" },
     { value: euro(stats.median_price), label: "precio mediano" },
     { value: stats.median_price_per_m2 ? `${num(stats.median_price_per_m2)} €/m²` : "—", label: "mediana por m²" },
     { value: relative(stats.last_scrape), label: "última captura" },
@@ -375,6 +376,7 @@ function listingCard(item) {
   if (item.is_new) badges.push('<span class="badge new">✦ Nuevo</span>');
   if (item.price_delta < 0) badges.push(`<span class="badge drop">↓ ${euro(Math.abs(item.price_delta))}</span>`);
   if (item.price_delta > 0) badges.push(`<span class="badge rise">↑ ${euro(item.price_delta)}</span>`);
+  if (item.is_sareb) badges.push('<span class="badge sareb">🏦 Sareb</span>');
 
   const zone = [item.neighborhood, item.district, item.city].filter(Boolean)[0];
   const floor = floorLabel(item.floor);
@@ -428,6 +430,7 @@ async function renderListings() {
   neighborhoodSelect.getSelected().forEach((value) => params.append("neighborhood", value));
   if (state.quick === "new") params.set("only_new", "true");
   if (state.quick === "drops") params.set("only_drops", "true");
+  if (state.quick === "sareb") params.set("only_sareb", "true");
 
   const data = await api(`/api/listings?${params}`);
   renderNeighborhoodOptions(data.facets?.neighborhoods ?? []);
