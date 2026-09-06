@@ -147,7 +147,7 @@ async def list_listings(
     max_price: float | None = None,
     min_rooms: int | None = None,
     min_surface: float | None = None,
-    neighborhood: str | None = None,
+    neighborhood: list[str] | None = Query(None),
     only_new: bool = False,
     only_drops: bool = False,
     order_by: str = Query(
@@ -178,7 +178,7 @@ async def list_listings(
     # never empties the dropdown that offered it.
     facets = {"neighborhoods": neighborhood_facets(frame)}
     if neighborhood:
-        frame = frame[frame["neighborhood"] == neighborhood]
+        frame = frame[frame["neighborhood"].isin(neighborhood)]
 
     matched = len(frame)
     frame = frame.sort_values(order_by, ascending=ascending, na_position="last").head(limit)

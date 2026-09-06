@@ -17,6 +17,99 @@ const relative = (iso) => {
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+/* ── Multi-select dropdown (grouped checkboxes, e.g. barrio by distrito) ── */
+function createMultiSelect(root, { emptyLabel, onChange }) {
+  const trigger = root.querySelector(".msel-trigger");
+  const panel = root.querySelector(".msel-panel");
+  const search = root.querySelector(".msel-search");
+  const groupsEl = root.querySelector(".msel-groups");
+  const clearBtn = root.querySelector('[data-action="clear"]');
+  let groups = [];
+  const selected = new Set();
+
+  function renderOptions() {
+    const term = search.value.trim().toLowerCase();
+    const html = groups
+      .map((group) => {
+        const items = group.items.filter((item) => !term || item.label.toLowerCase().includes(term));
+        if (!items.length) return "";
+        return (
+          `<div class="msel-group-label">${escapeHtml(group.group)}</div>` +
+          items
+            .map(
+              (item) => `<label class="msel-option">
+                <input type="checkbox" value="${escapeHtml(item.value)}" ${selected.has(item.value) ? "checked" : ""} />
+                <span>${escapeHtml(item.label)}</span>
+                <span class="muted">${item.count}</span>
+              </label>`,
+            )
+            .join("")
+        );
+      })
+      .join("");
+    groupsEl.innerHTML = html || '<div class="msel-empty">Sin resultados</div>';
+  }
+
+  function renderTrigger() {
+    if (!selected.size) {
+      trigger.textContent = emptyLabel;
+      return;
+    }
+    if (selected.size === 1) {
+      const value = [...selected][0];
+      const found = groups.flatMap((g) => g.items).find((i) => i.value === value);
+      trigger.textContent = found ? found.label : value;
+      return;
+    }
+    trigger.innerHTML = `Varios barrios <span class="count-badge">${selected.size}</span>`;
+  }
+
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) search.focus();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!root.contains(event.target)) panel.classList.add("hidden");
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") panel.classList.add("hidden");
+  });
+
+  search.addEventListener("input", renderOptions);
+
+  groupsEl.addEventListener("change", (event) => {
+    const checkbox = event.target.closest('input[type="checkbox"]');
+    if (!checkbox) return;
+    if (checkbox.checked) selected.add(checkbox.value);
+    else selected.delete(checkbox.value);
+    renderTrigger();
+    onChange([...selected]);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    selected.clear();
+    renderOptions();
+    renderTrigger();
+    onChange([...selected]);
+  });
+
+  return {
+    setGroups(newGroups) {
+      groups = newGroups;
+      const known = new Set(groups.flatMap((g) => g.items.map((i) => i.value)));
+      [...selected].forEach((value) => {
+        if (!known.has(value)) selected.delete(value);
+      });
+      renderOptions();
+      renderTrigger();
+    },
+    getSelected: () => [...selected],
+  };
+}
+
 /** Fotocasa gives a bare number, idealista/pisos.com a phrase like "4ª planta exterior". */
 function floorLabel(floor) {
   if (floor == null || floor === "") return null;
@@ -81,6 +174,11 @@ function renderKpis() {
     .join("");
 }
 
+const neighborhoodSelect = createMultiSelect(el("f-neighborhood"), {
+  emptyLabel: "Todos los barrios",
+  onChange: renderListings,
+});
+
 function renderFilterOptions() {
   const portals = [...new Set(state.data.listings.map((item) => item.portal))].sort();
   el("f-portal").innerHTML = '<option value="">Todos</option>' + portals.map((p) => `<option value="${p}">${p}</option>`).join("");
@@ -88,17 +186,9 @@ function renderFilterOptions() {
   const groups = new Map();
   (state.data.facets?.neighborhoods ?? []).forEach((facet) => {
     if (!groups.has(facet.group)) groups.set(facet.group, []);
-    groups.get(facet.group).push(facet);
+    groups.get(facet.group).push({ value: facet.neighborhood, label: facet.neighborhood, count: facet.count });
   });
-  const options = [...groups.entries()]
-    .map(
-      ([group, items]) =>
-        `<optgroup label="${escapeHtml(group)}">${items
-          .map((item) => `<option value="${escapeHtml(item.neighborhood)}">${escapeHtml(item.neighborhood)} (${item.count})</option>`)
-          .join("")}</optgroup>`,
-    )
-    .join("");
-  el("f-neighborhood").innerHTML = `<option value="">Todos los barrios</option>${options}`;
+  neighborhoodSelect.setGroups([...groups.entries()].map(([group, items]) => ({ group, items })));
 }
 
 function listingCard(item) {
@@ -145,7 +235,7 @@ function renderListings() {
   let items = [...state.data.listings];
 
   const portal = el("f-portal").value;
-  const neighborhood = el("f-neighborhood").value;
+  const neighborhoods = neighborhoodSelect.getSelected();
   const maxPrice = Number(el("f-max-price").value) || null;
   const minRooms = Number(el("f-min-rooms").value) || null;
   const minSurface = Number(el("f-min-surface").value) || null;
@@ -153,7 +243,7 @@ function renderListings() {
 
   const total = items.length;
   if (portal) items = items.filter((i) => i.portal === portal);
-  if (neighborhood) items = items.filter((i) => i.neighborhood === neighborhood);
+  if (neighborhoods.length) items = items.filter((i) => neighborhoods.includes(i.neighborhood));
   if (maxPrice) items = items.filter((i) => i.price != null && i.price <= maxPrice);
   if (minRooms) items = items.filter((i) => i.rooms != null && i.rooms >= minRooms);
   if (minSurface) items = items.filter((i) => i.surface_m2 != null && i.surface_m2 >= minSurface);
@@ -200,7 +290,7 @@ el("sort-dir").addEventListener("click", () => {
   renderListings();
 });
 
-["f-portal", "f-neighborhood", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
+["f-portal", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
   el(id).addEventListener("change", renderListings),
 );
 

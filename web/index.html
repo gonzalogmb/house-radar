@@ -117,10 +117,17 @@
             <button class="chip" data-quick="drops" aria-pressed="false">↓ Bajadas</button>
           </div>
           <div class="toolbar-fields">
-            <label class="field inline wide">
+            <div class="field inline wide">
               <span>Barrio</span>
-              <select id="f-neighborhood"><option value="">Todos los barrios</option></select>
-            </label>
+              <div class="msel" id="f-neighborhood">
+                <button type="button" class="msel-trigger">Todos los barrios</button>
+                <div class="msel-panel hidden">
+                  <input type="text" class="msel-search" placeholder="Buscar barrio…" />
+                  <div class="msel-actions"><button type="button" data-action="clear">Limpiar</button></div>
+                  <div class="msel-groups"></div>
+                </div>
+              </div>
+            </div>
             <label class="field inline">
               <span>Portal</span>
               <select id="f-portal"><option value="">Todos</option></select>

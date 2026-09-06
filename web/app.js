@@ -26,6 +26,101 @@ const escapeHtml = (value) =>
 const state = { meta: {}, quick: "all", ascending: false, operation: "venta", portals: [] };
 let pollTimer = null;
 
+/* ── Multi-select dropdown (grouped checkboxes, e.g. barrio by distrito) ── */
+function createMultiSelect(root, { emptyLabel, onChange }) {
+  const trigger = root.querySelector(".msel-trigger");
+  const panel = root.querySelector(".msel-panel");
+  const search = root.querySelector(".msel-search");
+  const groupsEl = root.querySelector(".msel-groups");
+  const clearBtn = root.querySelector('[data-action="clear"]');
+  let groups = [];
+  const selected = new Set();
+
+  function renderOptions() {
+    const term = search.value.trim().toLowerCase();
+    const html = groups
+      .map((group) => {
+        const items = group.items.filter((item) => !term || item.label.toLowerCase().includes(term));
+        if (!items.length) return "";
+        return (
+          `<div class="msel-group-label">${escapeHtml(group.group)}</div>` +
+          items
+            .map(
+              (item) => `<label class="msel-option">
+                <input type="checkbox" value="${escapeHtml(item.value)}" ${selected.has(item.value) ? "checked" : ""} />
+                <span>${escapeHtml(item.label)}</span>
+                <span class="muted">${item.count}</span>
+              </label>`,
+            )
+            .join("")
+        );
+      })
+      .join("");
+    groupsEl.innerHTML = html || '<div class="msel-empty">Sin resultados</div>';
+  }
+
+  function renderTrigger() {
+    if (!selected.size) {
+      trigger.textContent = emptyLabel;
+      return;
+    }
+    if (selected.size === 1) {
+      const value = [...selected][0];
+      const found = groups.flatMap((g) => g.items).find((i) => i.value === value);
+      trigger.textContent = found ? found.label : value;
+      return;
+    }
+    trigger.innerHTML = `Varios barrios <span class="count-badge">${selected.size}</span>`;
+  }
+
+  trigger.addEventListener("click", (event) => {
+    event.stopPropagation();
+    panel.classList.toggle("hidden");
+    if (!panel.classList.contains("hidden")) search.focus();
+  });
+
+  document.addEventListener("click", (event) => {
+    if (!root.contains(event.target)) panel.classList.add("hidden");
+  });
+
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape") panel.classList.add("hidden");
+  });
+
+  search.addEventListener("input", renderOptions);
+
+  groupsEl.addEventListener("change", (event) => {
+    const checkbox = event.target.closest('input[type="checkbox"]');
+    if (!checkbox) return;
+    if (checkbox.checked) selected.add(checkbox.value);
+    else selected.delete(checkbox.value);
+    renderTrigger();
+    onChange([...selected]);
+  });
+
+  clearBtn.addEventListener("click", () => {
+    selected.clear();
+    renderOptions();
+    renderTrigger();
+    onChange([...selected]);
+  });
+
+  return {
+    setGroups(newGroups) {
+      groups = newGroups;
+      // Drop selections that no longer exist among the offered options (e.g. a
+      // neighbourhood filtered out entirely by the other active filters).
+      const known = new Set(groups.flatMap((g) => g.items.map((i) => i.value)));
+      [...selected].forEach((value) => {
+        if (!known.has(value)) selected.delete(value);
+      });
+      renderOptions();
+      renderTrigger();
+    },
+    getSelected: () => [...selected],
+  };
+}
+
 /* ── Toasts ─────────────────────────────────────────────── */
 function toast(message, kind = "") {
   const node = document.createElement("div");
@@ -248,35 +343,23 @@ el("sort-dir").addEventListener("click", () => {
   renderListings();
 });
 
-["f-portal", "f-neighborhood", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
+["f-portal", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
   el(id).addEventListener("change", renderListings),
 );
 
+const neighborhoodSelect = createMultiSelect(el("f-neighborhood"), {
+  emptyLabel: "Todos los barrios",
+  onChange: renderListings,
+});
+
 /** Barrios agrupados por distrito, con el recuento de anuncios de cada uno. */
 function renderNeighborhoodOptions(facets) {
-  const select = el("f-neighborhood");
-  const selected = select.value;
   const groups = new Map();
   facets.forEach((facet) => {
     if (!groups.has(facet.group)) groups.set(facet.group, []);
-    groups.get(facet.group).push(facet);
+    groups.get(facet.group).push({ value: facet.neighborhood, label: facet.neighborhood, count: facet.count });
   });
-
-  const options = [...groups.entries()]
-    .map(
-      ([group, items]) =>
-        `<optgroup label="${escapeHtml(group)}">${items
-          .map(
-            (item) =>
-              `<option value="${escapeHtml(item.neighborhood)}">${escapeHtml(item.neighborhood)} (${item.count})</option>`,
-          )
-          .join("")}</optgroup>`,
-    )
-    .join("");
-
-  select.innerHTML = `<option value="">Todos los barrios</option>${options}`;
-  // Keep the choice across refreshes; drop it if that barrio no longer has results.
-  if (selected && select.querySelector(`option[value="${CSS.escape(selected)}"]`)) select.value = selected;
+  neighborhoodSelect.setGroups([...groups.entries()].map(([group, items]) => ({ group, items })));
 }
 
 /** Fotocasa gives a bare number, idealista a phrase like "4ª planta exterior". */
@@ -337,12 +420,12 @@ async function renderListings() {
   const params = new URLSearchParams({ order_by: el("f-order").value, ascending: String(state.ascending) });
   const optional = {
     portal: el("f-portal").value,
-    neighborhood: el("f-neighborhood").value,
     max_price: el("f-max-price").value,
     min_rooms: el("f-min-rooms").value,
     min_surface: el("f-min-surface").value,
   };
   Object.entries(optional).forEach(([key, value]) => value && params.set(key, value));
+  neighborhoodSelect.getSelected().forEach((value) => params.append("neighborhood", value));
   if (state.quick === "new") params.set("only_new", "true");
   if (state.quick === "drops") params.set("only_drops", "true");
 
