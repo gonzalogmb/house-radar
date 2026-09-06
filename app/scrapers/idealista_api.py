@@ -27,6 +27,7 @@ OPERATION = {"venta": "sale", "alquiler": "rent"}
 
 class IdealistaApiScraper(Scraper):
     portal = "idealista"
+    unavailable_fields = frozenset({"published_at"})
 
     def supports(self, criteria: SearchCriteria) -> bool:
         return bool(criteria.center and self.settings.idealista_api_key)
@@ -60,7 +61,7 @@ class IdealistaApiScraper(Scraper):
             listing.search_id = self.search_id
             listing.scraped_at = datetime.now(timezone.utc)
         result.listings = len(listings)
-        result.field_coverage = field_coverage(listings)
+        result.field_coverage = field_coverage(listings, exclude=self.unavailable_fields)
         return listings, result
 
     async def _get_token(self, client: httpx.AsyncClient) -> str:

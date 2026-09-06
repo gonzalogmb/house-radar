@@ -236,9 +236,36 @@ el("sort-dir").addEventListener("click", () => {
   renderListings();
 });
 
-["f-portal", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
+["f-portal", "f-neighborhood", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
   el(id).addEventListener("change", renderListings),
 );
+
+/** Barrios agrupados por distrito, con el recuento de anuncios de cada uno. */
+function renderNeighborhoodOptions(facets) {
+  const select = el("f-neighborhood");
+  const selected = select.value;
+  const groups = new Map();
+  facets.forEach((facet) => {
+    if (!groups.has(facet.group)) groups.set(facet.group, []);
+    groups.get(facet.group).push(facet);
+  });
+
+  const options = [...groups.entries()]
+    .map(
+      ([group, items]) =>
+        `<optgroup label="${escapeHtml(group)}">${items
+          .map(
+            (item) =>
+              `<option value="${escapeHtml(item.neighborhood)}">${escapeHtml(item.neighborhood)} (${item.count})</option>`,
+          )
+          .join("")}</optgroup>`,
+    )
+    .join("");
+
+  select.innerHTML = `<option value="">Todos los barrios</option>${options}`;
+  // Keep the choice across refreshes; drop it if that barrio no longer has results.
+  if (selected && select.querySelector(`option[value="${CSS.escape(selected)}"]`)) select.value = selected;
+}
 
 /** Fotocasa gives a bare number, idealista a phrase like "4ª planta exterior". */
 function floorLabel(floor) {
@@ -298,6 +325,7 @@ async function renderListings() {
   const params = new URLSearchParams({ order_by: el("f-order").value, ascending: String(state.ascending) });
   const optional = {
     portal: el("f-portal").value,
+    neighborhood: el("f-neighborhood").value,
     max_price: el("f-max-price").value,
     min_rooms: el("f-min-rooms").value,
     min_surface: el("f-min-surface").value,
@@ -307,6 +335,7 @@ async function renderListings() {
   if (state.quick === "drops") params.set("only_drops", "true");
 
   const data = await api(`/api/listings?${params}`);
+  renderNeighborhoodOptions(data.facets?.neighborhoods ?? []);
   el("listings-count").textContent = data.total
     ? `${nf.format(data.matched)} de ${nf.format(data.total)} anuncios · mostrando ${data.items.length}`
     : "";

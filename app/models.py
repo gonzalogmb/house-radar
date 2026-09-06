@@ -19,7 +19,7 @@ class SearchCriteria(BaseModel):
     )
     radius_m: int = 8000
     operation: Operation = "venta"
-    portals: list[str] = Field(default_factory=lambda: ["idealista", "fotocasa"])
+    portals: list[str] = Field(default_factory=lambda: ["idealista", "fotocasa", "pisos"])
     min_price: int | None = None
     max_price: int | None = None
     min_rooms: int | None = None

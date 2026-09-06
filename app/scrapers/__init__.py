@@ -3,8 +3,9 @@ from app.scrapers.base import BaseScraper, Scraper
 from app.scrapers.fotocasa import FotocasaScraper
 from app.scrapers.idealista import IdealistaScraper
 from app.scrapers.idealista_api import IdealistaApiScraper
+from app.scrapers.pisos import PisosScraper
 
-PORTALS = ("idealista", "fotocasa")
+PORTALS = ("idealista", "fotocasa", "pisos")
 
 
 def scraper_for(portal: str) -> type[Scraper] | None:
@@ -14,6 +15,8 @@ def scraper_for(portal: str) -> type[Scraper] | None:
         return IdealistaApiScraper if get_settings().idealista_api_key else IdealistaScraper
     if portal == "fotocasa":
         return FotocasaScraper
+    if portal == "pisos":
+        return PisosScraper
     return None
 
 
@@ -23,6 +26,7 @@ __all__ = [
     "FotocasaScraper",
     "IdealistaApiScraper",
     "IdealistaScraper",
+    "PisosScraper",
     "Scraper",
     "scraper_for",
 ]

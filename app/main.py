@@ -129,6 +129,7 @@ async def list_listings(
     max_price: float | None = None,
     min_rooms: int | None = None,
     min_surface: float | None = None,
+    neighborhood: str | None = None,
     only_new: bool = False,
     only_drops: bool = False,
     order_by: str = Query(
@@ -139,7 +140,7 @@ async def list_listings(
 ) -> dict:
     frame = load_listings_enriched(portal=portal, search_id=search_id)
     if frame.empty:
-        return {"total": 0, "matched": 0, "items": []}
+        return {"total": 0, "matched": 0, "items": [], "facets": {"neighborhoods": []}}
 
     total = len(frame)
     if min_price is not None:
@@ -155,9 +156,15 @@ async def list_listings(
     if only_drops:
         frame = frame[frame["price_delta"] < 0]
 
+    # Facets come from everything the other filters allow, so picking a neighbourhood
+    # never empties the dropdown that offered it.
+    facets = {"neighborhoods": _neighborhood_facets(frame)}
+    if neighborhood:
+        frame = frame[frame["neighborhood"] == neighborhood]
+
     matched = len(frame)
     frame = frame.sort_values(order_by, ascending=ascending, na_position="last").head(limit)
-    return {"total": total, "matched": matched, "items": _to_records(frame)}
+    return {"total": total, "matched": matched, "items": _to_records(frame), "facets": facets}
 
 
 @app.get("/api/listings/{portal}/{listing_id}/history")
@@ -180,6 +187,21 @@ async def stats() -> dict:
         "median_price_per_m2": _safe_float(frame["price_per_m2"].median()),
         "last_scrape": _safe_iso(frame["scraped_at"].max()),
     }
+
+
+def _neighborhood_facets(frame: pd.DataFrame) -> list[dict]:
+    """Neighbourhoods present in the data, with their district for grouping and a count."""
+    known = frame[frame["neighborhood"].notna() & (frame["neighborhood"] != "")]
+    if known.empty:
+        return []
+    grouped = (
+        known.assign(group=known["district"].fillna(known["city"]).fillna("Otros"))
+        .groupby(["group", "neighborhood"])
+        .size()
+        .reset_index(name="count")
+        .sort_values(["group", "count"], ascending=[True, False])
+    )
+    return grouped.to_dict("records")
 
 
 def _to_records(frame: pd.DataFrame) -> list[dict]:

@@ -30,6 +30,10 @@ class Scraper(ABC):
     """What a source must offer: say whether it can run this search, and run it."""
 
     portal: str
+    #: Fields this source's search results never carry (e.g. pisos.com's list view has
+    #: no publish date). Excluded from coverage so a genuine parser break isn't lost in
+    #: permanent noise from a field that was never going to be there.
+    unavailable_fields: frozenset[str] = frozenset()
 
     def __init__(self, run_id: str, search_id: str | None = None) -> None:
         self.settings = get_settings()
@@ -117,15 +121,16 @@ class BaseScraper(Scraper):
 
         result.fetcher = fetcher.name
         result.listings = len(listings)
-        result.field_coverage = field_coverage(listings)
+        result.field_coverage = field_coverage(listings, exclude=self.unavailable_fields)
         return listings, result
 
 
-def field_coverage(listings: list[Listing]) -> dict[str, float]:
+def field_coverage(listings: list[Listing], exclude: frozenset[str] = frozenset()) -> dict[str, float]:
     """Share of listings with each key field populated — catches silent partial breakage."""
     if not listings:
         return {}
     return {
         name: round(sum(getattr(item, name) is not None for item in listings) / len(listings), 3)
         for name in COVERAGE_FIELDS
+        if name not in exclude
     }

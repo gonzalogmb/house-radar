@@ -111,34 +111,39 @@
             <button class="chip" data-quick="new" aria-pressed="false">✦ Nuevos</button>
             <button class="chip" data-quick="drops" aria-pressed="false">↓ Bajadas</button>
           </div>
-          <div class="toolbar-spacer"></div>
-          <label class="field inline">
-            <span>Portal</span>
-            <select id="f-portal"><option value="">Todos</option></select>
-          </label>
-          <label class="field inline">
-            <span>Precio máx.</span>
-            <input id="f-max-price" type="number" step="10000" placeholder="—" />
-          </label>
-          <label class="field inline">
-            <span>Hab. mín.</span>
-            <input id="f-min-rooms" type="number" min="0" max="10" placeholder="—" />
-          </label>
-          <label class="field inline">
-            <span>m² mín.</span>
-            <input id="f-min-surface" type="number" step="5" placeholder="—" />
-          </label>
-          <label class="field inline">
-            <span>Orden</span>
-            <select id="f-order">
-              <option value="first_seen">Novedad</option>
-              <option value="price">Precio</option>
-              <option value="price_per_m2">€/m²</option>
-              <option value="surface_m2">Superficie</option>
-              <option value="published_at">Publicación</option>
-            </select>
-          </label>
-          <button id="sort-dir" class="icon-btn" title="Invertir orden">↓</button>
+          <div class="toolbar-fields">
+            <label class="field inline wide">
+              <span>Barrio</span>
+              <select id="f-neighborhood"><option value="">Todos los barrios</option></select>
+            </label>
+            <label class="field inline">
+              <span>Portal</span>
+              <select id="f-portal"><option value="">Todos</option></select>
+            </label>
+            <label class="field inline">
+              <span>Precio máx.</span>
+              <input id="f-max-price" type="number" step="10000" placeholder="—" />
+            </label>
+            <label class="field inline">
+              <span>Hab. mín.</span>
+              <input id="f-min-rooms" type="number" min="0" max="10" placeholder="—" />
+            </label>
+            <label class="field inline">
+              <span>m² mín.</span>
+              <input id="f-min-surface" type="number" step="5" placeholder="—" />
+            </label>
+            <label class="field inline">
+              <span>Orden</span>
+              <select id="f-order">
+                <option value="first_seen">Novedad</option>
+                <option value="price">Precio</option>
+                <option value="price_per_m2">€/m²</option>
+                <option value="surface_m2">Superficie</option>
+                <option value="published_at">Publicación</option>
+              </select>
+            </label>
+            <button id="sort-dir" class="icon-btn" title="Invertir orden">↓</button>
+          </div>
         </div>
 
         <p id="listings-count" class="muted tiny count-line"></p>

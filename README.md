@@ -13,6 +13,7 @@ web (HTML/JS)  ->  FastAPI  ->  scrapers  ->  data/raw/*.html.gz   (payload ínt
 | Portal | Backend | Estado |
 |---|---|---|
 | **fotocasa** | HTTP + `BeautifulSoup` | Funciona. La página incrusta todo el resultado como JSON en `<script id="__initial_props__">`, así que leemos eso en vez del marcado: sobrevive a rediseños y trae más campos (coordenadas, código postal, fecha de publicación). |
+| **pisos.com** | HTTP + `BeautifulSoup` | Funciona, sin muro anti-bot detectado. Los filtros son segmentos de ruta en un orden fijo (`con-N-habitaciones`, `desde-N-m2`, `desde-N`, `hasta-N`) que el servidor reordena solo con un 301 si se los pasas en otro orden; no soporta fecha de publicación en el listado (se excluye de la cobertura de campos, no es una rotura). |
 | **idealista** | API oficial (`IdealistaApiScraper`) | Requiere clave. Su web pública está tras **DataDome** y responde `403` a cualquier cliente automatizado — comprobado con Chromium y Chrome reales, headless y con ventana. No se intenta evadir el muro. |
 | idealista | HTML (`IdealistaScraper`) | Fallback sin clave: el parser es correcto y está probado, pero devolverá el error del muro anti-bot en vez de fingir que funcionó. |
 
