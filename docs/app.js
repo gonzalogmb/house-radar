@@ -17,6 +17,92 @@ const relative = (iso) => {
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+/* ── Manual scrape trigger (owner-only, via GitHub's own API) ─────────────
+   This page has no backend, so "launch now" means asking GitHub to run the
+   daily-scrape workflow on our behalf. That needs a token — there is no login
+   system here, so the button is visible to every visitor, but only works for
+   whoever holds a token with write access to this repo's Actions (i.e. the
+   owner). The token lives only in that person's own browser (localStorage);
+   it is sent straight to api.github.com and nowhere else, and this page has no
+   way to read anyone else's copy of it. */
+const GH_OWNER = "gonzalogmb";
+const GH_REPO = "house-radar";
+const GH_WORKFLOW = "daily-scrape.yml";
+const GH_TOKEN_KEY = "hr-gh-token";
+
+function getStoredToken() {
+  try {
+    return localStorage.getItem(GH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function setStoredToken(value) {
+  try {
+    if (value) localStorage.setItem(GH_TOKEN_KEY, value);
+    else localStorage.removeItem(GH_TOKEN_KEY);
+  } catch {
+    /* private browsing: it just won't be remembered next time */
+  }
+}
+
+async function triggerScrape() {
+  let token = getStoredToken();
+  if (!token) {
+    token = window.prompt(
+      "Pega un token de GitHub (fine-grained, permiso 'Actions: Read and write' solo en este repositorio).\n\n" +
+        "Se guarda únicamente en este navegador y se envía directamente a api.github.com — nunca pasa por ningún otro sitio.",
+    );
+    if (!token) return;
+    setStoredToken(token);
+  }
+
+  const button = el("run-scrape");
+  const originalLabel = button.textContent;
+  button.disabled = true;
+  button.textContent = "Lanzando…";
+
+  try {
+    const response = await fetch(
+      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+        body: JSON.stringify({ ref: "main" }),
+      },
+    );
+
+    if (response.status === 204) {
+      button.textContent = "✓ Lanzado";
+      setTimeout(() => {
+        button.textContent = originalLabel;
+        button.disabled = false;
+      }, 5000);
+      return;
+    }
+
+    if (response.status === 401 || response.status === 403) {
+      setStoredToken(null);
+      alert("Token inválido o sin permiso 'Actions: Read and write' en este repositorio. Vuelve a intentarlo con uno correcto.");
+    } else {
+      const body = await response.text();
+      alert(`GitHub respondió ${response.status}: ${body.slice(0, 200)}`);
+    }
+  } catch (error) {
+    alert(`No se pudo contactar con GitHub: ${error.message}`);
+  }
+
+  button.textContent = originalLabel;
+  button.disabled = false;
+}
+
+el("run-scrape").addEventListener("click", triggerScrape);
+
 /* ── Multi-select dropdown (grouped checkboxes, e.g. barrio by distrito) ── */
 function createMultiSelect(root, { emptyLabel, onChange }) {
   const trigger = root.querySelector(".msel-trigger");

@@ -55,10 +55,22 @@ ningún sitio ni factura de por medio:
 - `docs/` es una página estática (sin FastAPI, sin Python en el navegador) que lee ese
   JSON y filtra/ordena en el cliente. La sirve GitHub Pages: gratis para siempre, no se
   duerme, no tiene disco que pagar.
-- Por diseño no hay pestaña de Ejecuciones en vivo ni forma de lanzar un scrape desde
-  la web: los datos se refrescan una vez al día vía Actions, igual de frescos que el
-  run diario del servidor completo, solo que no hay nada corriendo entre medias que
-  alguien pueda abusar.
+- No hay pestaña de Ejecuciones en vivo — no hay servidor que lleve la cuenta de un run
+  mientras ocurre — pero sí un botón **"Lanzar scraping ahora"** en la propia página.
+  Como no hay backend, ese botón le pide a la API de GitHub que dispare el workflow
+  (exactamente lo mismo que hace `workflow_dispatch` desde la pestaña Actions, solo que
+  sin salir de la web). La página es pública y cualquiera ve el botón, pero solo
+  funciona para quien tenga un token con permiso de escritura sobre las Actions de
+  este repo — la primera vez que lo pulsas te lo pide, y se queda guardado únicamente
+  en tu navegador (`localStorage`), sin pasar por ningún otro sitio que no sea
+  `api.github.com`. Un visitante sin ese token solo consigue un cuadro de diálogo
+  pidiéndoselo, y no puede hacer nada con él.
+
+  Para generarte el token: GitHub → tu avatar → **Settings → Developer settings →
+  Personal access tokens → Fine-grained tokens → Generate new token**. Limítalo a
+  **Only select repositories** → `house-radar`, y en **Repository permissions** dale
+  a **Actions: Read and write** (nada más). Cópialo y pégalo la primera vez que pulses
+  el botón. Si alguna vez quieres revocarlo, es la misma pantalla.
 
 Puesta en marcha (una sola vez):
 
