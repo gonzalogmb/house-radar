@@ -17,18 +17,58 @@ const relative = (iso) => {
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
-/* ── Manual scrape trigger (owner-only, via GitHub's own API) ─────────────
-   This page has no backend, so "launch now" means asking GitHub to run the
-   daily-scrape workflow on our behalf. That needs a token — there is no login
-   system here, so the button is visible to every visitor, but only works for
-   whoever holds a token with write access to this repo's Actions (i.e. the
-   owner). The token lives only in that person's own browser (localStorage);
-   it is sent straight to api.github.com and nowhere else, and this page has no
-   way to read anyone else's copy of it. */
+function toast(message, kind = "") {
+  const node = document.createElement("div");
+  node.className = `toast ${kind}`;
+  node.textContent = message;
+  el("toasts").append(node);
+  setTimeout(() => node.remove(), 4200);
+}
+
+/* ── This place, mirrored from app/locations.py ────────────────────────
+   Keep in sync by hand: there is no backend here to serve it fresh. ── */
+const CATALOGUE = {
+  "Madrid capital": {
+    slugs: { idealista: "madrid-madrid", fotocasa: "madrid-capital", pisos: "madrid_capital" },
+    center: "40.4168,-3.7038",
+  },
+  "Barcelona capital": {
+    slugs: { idealista: "barcelona-barcelona", fotocasa: "barcelona-capital", pisos: "barcelona_capital" },
+    center: "41.3874,2.1686",
+  },
+  "Valencia capital": {
+    slugs: { idealista: "valencia-valencia", fotocasa: "valencia-capital", pisos: "valencia_capital" },
+    center: "39.4699,-0.3763",
+  },
+  "Sevilla capital": {
+    slugs: { idealista: "sevilla-sevilla", fotocasa: "sevilla-capital", pisos: "sevilla_capital" },
+    center: "37.3891,-5.9845",
+  },
+  "Zaragoza capital": {
+    slugs: { idealista: "zaragoza-zaragoza", fotocasa: "zaragoza-capital", pisos: "zaragoza_capital" },
+    center: "41.6488,-0.8891",
+  },
+  "Málaga capital": {
+    slugs: { idealista: "malaga-malaga", fotocasa: "malaga-capital", pisos: "malaga_capital" },
+    center: "36.7213,-4.4214",
+  },
+};
+const PORTALS = ["idealista", "fotocasa", "pisos"];
+
+/* ── GitHub as the backend ──────────────────────────────────────────────
+   This page has none of its own. Browsing (Resultados, Ejecuciones, the
+   list of saved searches) only ever does plain unauthenticated reads —
+   GitHub allows that for a public repo, so no visitor is asked for
+   anything just to look. Only a write (guardar/lanzar/borrar) prompts for
+   a token, and only the owner's own token can actually succeed: GitHub
+   itself rejects anything else with 401/403, which the page treats the
+   same way regardless of who's asking. */
 const GH_OWNER = "gonzalogmb";
 const GH_REPO = "house-radar";
 const GH_WORKFLOW = "daily-scrape.yml";
 const GH_TOKEN_KEY = "hr-gh-token";
+const GH_API = "https://api.github.com";
+const GH_HEADERS = { Accept: "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28" };
 
 function getStoredToken() {
   try {
@@ -47,61 +87,116 @@ function setStoredToken(value) {
   }
 }
 
-async function triggerScrape() {
+function ensureToken() {
   let token = getStoredToken();
   if (!token) {
     token = window.prompt(
-      "Pega un token de GitHub (fine-grained, permiso 'Actions: Read and write' solo en este repositorio).\n\n" +
-        "Se guarda únicamente en este navegador y se envía directamente a api.github.com — nunca pasa por ningún otro sitio.",
+      "Pega un token de GitHub (fine-grained, permisos 'Contents' y 'Actions' en modo " +
+        "Read and write, solo sobre este repositorio).\n\n" +
+        "Se guarda únicamente en este navegador y se envía directamente a api.github.com.",
     );
-    if (!token) return;
-    setStoredToken(token);
+    if (token) setStoredToken(token);
   }
-
-  const button = el("run-scrape");
-  const originalLabel = button.textContent;
-  button.disabled = true;
-  button.textContent = "Lanzando…";
-
-  try {
-    const response = await fetch(
-      `https://api.github.com/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
-      {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/vnd.github+json",
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-        body: JSON.stringify({ ref: "main" }),
-      },
-    );
-
-    if (response.status === 204) {
-      button.textContent = "✓ Lanzado";
-      setTimeout(() => {
-        button.textContent = originalLabel;
-        button.disabled = false;
-      }, 5000);
-      return;
-    }
-
-    if (response.status === 401 || response.status === 403) {
-      setStoredToken(null);
-      alert("Token inválido o sin permiso 'Actions: Read and write' en este repositorio. Vuelve a intentarlo con uno correcto.");
-    } else {
-      const body = await response.text();
-      alert(`GitHub respondió ${response.status}: ${body.slice(0, 200)}`);
-    }
-  } catch (error) {
-    alert(`No se pudo contactar con GitHub: ${error.message}`);
-  }
-
-  button.textContent = originalLabel;
-  button.disabled = false;
+  return token;
 }
 
-el("run-scrape").addEventListener("click", triggerScrape);
+/** Authenticated call — used for anything that writes (save, delete, launch). */
+async function ghWrite(path, options = {}) {
+  const token = ensureToken();
+  if (!token) throw new Error("Se necesita un token de GitHub para esto.");
+  const response = await fetch(`${GH_API}${path}`, {
+    ...options,
+    headers: { ...GH_HEADERS, Authorization: `Bearer ${token}`, ...(options.headers || {}) },
+  });
+  if (response.status === 401 || response.status === 403) {
+    setStoredToken(null);
+    throw new Error("Token inválido o sin permisos suficientes en este repositorio.");
+  }
+  return response;
+}
+
+/** Plain read — no token, works for anyone on a public repo. */
+async function ghRead(path) {
+  return fetch(`${GH_API}${path}`, { headers: GH_HEADERS });
+}
+
+function utf8ToBase64(str) {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
+}
+
+function base64ToUtf8(b64) {
+  return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
+}
+
+async function readSearchesFile() {
+  const response = await ghRead(`/repos/${GH_OWNER}/${GH_REPO}/contents/site/searches.json?ref=main`);
+  if (!response.ok) throw new Error(`No se pudo leer site/searches.json (HTTP ${response.status})`);
+  const data = await response.json();
+  return { sha: data.sha, searches: JSON.parse(base64ToUtf8(data.content)) };
+}
+
+async function readSearchesFileAuthenticated() {
+  const response = await ghWrite(`/repos/${GH_OWNER}/${GH_REPO}/contents/site/searches.json?ref=main`);
+  if (!response.ok) throw new Error(`No se pudo leer site/searches.json (HTTP ${response.status})`);
+  const data = await response.json();
+  return { sha: data.sha, searches: JSON.parse(base64ToUtf8(data.content)) };
+}
+
+async function writeSearchesFile(searches, sha, message) {
+  const response = await ghWrite(`/repos/${GH_OWNER}/${GH_REPO}/contents/site/searches.json`, {
+    method: "PUT",
+    body: JSON.stringify({
+      message,
+      content: utf8ToBase64(JSON.stringify(searches, null, 2) + "\n"),
+      sha,
+      branch: "main",
+    }),
+  });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`No se pudo guardar (HTTP ${response.status}): ${body.slice(0, 200)}`);
+  }
+}
+
+async function dispatchWorkflow(searchName) {
+  const response = await ghWrite(`/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`, {
+    method: "POST",
+    body: JSON.stringify({ ref: "main", inputs: searchName ? { search_name: searchName } : {} }),
+  });
+  if (response.status !== 204) {
+    const body = await response.text();
+    throw new Error(`GitHub respondió ${response.status}: ${body.slice(0, 200)}`);
+  }
+}
+
+async function readWorkflowRuns() {
+  const response = await ghRead(`/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/runs?per_page=15`);
+  if (!response.ok) throw new Error(`No se pudo leer el historial (HTTP ${response.status})`);
+  const data = await response.json();
+  return data.workflow_runs;
+}
+
+/* ── Theme (same convention as the live app, separate storage key) ────── */
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  el("theme-toggle").textContent = theme === "light" ? "☀" : "☾";
+  try {
+    localStorage.setItem("hr-demo-theme", theme);
+  } catch {
+    /* private mode: the choice just won't stick */
+  }
+}
+
+let storedTheme = "dark";
+try {
+  storedTheme = localStorage.getItem("hr-demo-theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+} catch {
+  /* ignore */
+}
+applyTheme(storedTheme);
+el("theme-toggle").addEventListener("click", () =>
+  applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"),
+);
 
 /* ── Multi-select dropdown (grouped checkboxes, e.g. barrio by distrito) ── */
 function createMultiSelect(root, { emptyLabel, onChange }) {
@@ -204,30 +299,8 @@ function floorLabel(floor) {
   return text === "0" ? "bajo" : `planta ${text}`;
 }
 
-/* ── Theme (same convention as the live app, separate storage key) ────── */
-function applyTheme(theme) {
-  document.documentElement.dataset.theme = theme;
-  el("theme-toggle").textContent = theme === "light" ? "☀" : "☾";
-  try {
-    localStorage.setItem("hr-demo-theme", theme);
-  } catch {
-    /* private mode: the choice just won't stick */
-  }
-}
-
-let storedTheme = "dark";
-try {
-  storedTheme = localStorage.getItem("hr-demo-theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
-} catch {
-  /* ignore */
-}
-applyTheme(storedTheme);
-el("theme-toggle").addEventListener("click", () =>
-  applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light"),
-);
-
-/* ── Data ───────────────────────────────────────────────── */
-const state = { data: null, quick: "all", ascending: false };
+/* ── Data (Resultados tab) ──────────────────────────────────────────── */
+const state = { data: null, quick: "all", ascending: false, operation: "venta" };
 
 async function loadData() {
   const response = await fetch("data.json", { cache: "no-store" });
@@ -319,6 +392,7 @@ function listingCard(item) {
 }
 
 function renderListings() {
+  if (!state.data) return;
   const grid = el("listings-grid");
   let items = [...state.data.listings];
 
@@ -382,6 +456,221 @@ el("sort-dir").addEventListener("click", () => {
 ["f-portal", "f-max-price", "f-min-rooms", "f-min-surface", "f-order"].forEach((id) =>
   el(id).addEventListener("change", renderListings),
 );
+
+/* ── Búsquedas tab ──────────────────────────────────────────────────── */
+el("location-select").innerHTML = Object.keys(CATALOGUE)
+  .map((name) => `<option value="${escapeHtml(name)}">${escapeHtml(name)}</option>`)
+  .join("");
+
+el("portals-field").innerHTML = PORTALS.map(
+  (portal) => `<button type="button" class="chip" data-portal="${portal}" aria-pressed="true">${portal}</button>`,
+).join("");
+el("portals-field")
+  .querySelectorAll("[data-portal]")
+  .forEach((chip) =>
+    chip.addEventListener("click", () =>
+      chip.setAttribute("aria-pressed", chip.getAttribute("aria-pressed") === "true" ? "false" : "true"),
+    ),
+  );
+
+el("operation-toggle").addEventListener("click", (event) => {
+  const button = event.target.closest(".seg");
+  if (!button) return;
+  state.operation = button.dataset.value;
+  el("operation-toggle")
+    .querySelectorAll(".seg")
+    .forEach((seg) => seg.classList.toggle("active", seg === button));
+});
+
+function readSearchForm() {
+  const form = el("search-form");
+  const data = new FormData(form);
+  const number = (key) => (data.get(key) ? Number(data.get(key)) : null);
+  const locationName = data.get("location");
+  const portals = [...el("portals-field").querySelectorAll('[aria-pressed="true"]')].map((c) => c.dataset.portal);
+  if (!portals.length) throw new Error("Selecciona al menos un portal");
+
+  const location = CATALOGUE[locationName];
+  return {
+    name: data.get("name") || locationName,
+    criteria: {
+      location_name: locationName,
+      location_slugs: Object.fromEntries(portals.map((p) => [p, location.slugs[p]]).filter(([, slug]) => slug)),
+      center: location.center,
+      operation: state.operation,
+      portals,
+      min_price: number("min_price"),
+      max_price: number("max_price"),
+      min_rooms: number("min_rooms"),
+      min_surface: number("min_surface"),
+      max_pages: number("max_pages"),
+    },
+  };
+}
+
+el("search-form").addEventListener("submit", async (event) => {
+  event.preventDefault();
+  const submitBtn = event.target.querySelector('button[type="submit"]');
+  try {
+    const payload = readSearchForm();
+    submitBtn.disabled = true;
+    const { sha, searches } = await readSearchesFileAuthenticated();
+    searches.push(payload);
+    await writeSearchesFile(searches, sha, `Add search: ${payload.name}`);
+    toast(`Búsqueda "${payload.name}" guardada`, "success");
+    event.target.reset();
+    renderSearches();
+  } catch (error) {
+    toast(`No se pudo guardar: ${error.message}`, "error");
+  } finally {
+    submitBtn.disabled = false;
+  }
+});
+
+el("run-all").addEventListener("click", async () => {
+  const button = el("run-all");
+  button.disabled = true;
+  try {
+    await dispatchWorkflow(null);
+    toast("Scraping lanzado para todas las búsquedas — tardará 1-2 min.", "success");
+  } catch (error) {
+    toast(error.message, "error");
+  } finally {
+    button.disabled = false;
+  }
+});
+
+async function renderSearches() {
+  const container = el("searches-list");
+  let searches;
+  try {
+    ({ searches } = await readSearchesFile());
+  } catch (error) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>
+      <div class="empty-title">No se pudo leer site/searches.json</div>
+      <div class="tiny">${escapeHtml(error.message)}</div></div>`;
+    return;
+  }
+
+  if (!searches.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div>
+      <div class="empty-title">Sin búsquedas guardadas</div>
+      <div class="tiny">Rellena el formulario y guárdala: entrará en el run diario.</div></div>`;
+    return;
+  }
+
+  container.innerHTML = searches
+    .map((search) => {
+      const c = search.criteria;
+      const bits = [
+        c.operation === "venta" ? "compra" : "alquiler",
+        c.min_price ? `desde ${euro(c.min_price)}` : null,
+        c.max_price ? `hasta ${euro(c.max_price)}` : null,
+        c.min_rooms ? `${c.min_rooms}+ hab` : null,
+        c.min_surface ? `${c.min_surface}+ m²` : null,
+      ].filter(Boolean);
+      return `<div class="saved">
+        <div class="saved-main">
+          <span class="saved-name">${escapeHtml(search.name)}</span>
+          <span class="saved-meta">${escapeHtml(c.location_name)} · ${bits.join(" · ")}</span>
+          <span class="saved-meta">${c.portals.join(", ")}</span>
+        </div>
+        <div class="actions">
+          <button class="btn primary small" data-run="${escapeHtml(search.name)}">Lanzar</button>
+          <button class="btn danger small ghost" data-delete="${escapeHtml(search.name)}">Borrar</button>
+        </div>
+      </div>`;
+    })
+    .join("");
+
+  container.querySelectorAll("[data-run]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        await dispatchWorkflow(button.dataset.run);
+        toast(`Scraping lanzado para "${button.dataset.run}" — tardará 1-2 min.`, "success");
+      } catch (error) {
+        toast(error.message, "error");
+      } finally {
+        button.disabled = false;
+      }
+    }),
+  );
+
+  container.querySelectorAll("[data-delete]").forEach((button) =>
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const { sha, searches: current } = await readSearchesFileAuthenticated();
+        const remaining = current.filter((s) => s.name !== button.dataset.delete);
+        await writeSearchesFile(remaining, sha, `Remove search: ${button.dataset.delete}`);
+        toast("Búsqueda borrada", "success");
+        renderSearches();
+      } catch (error) {
+        toast(error.message, "error");
+        button.disabled = false;
+      }
+    }),
+  );
+}
+
+/* ── Ejecuciones tab ────────────────────────────────────────────────── */
+const RUN_LABELS = { queued: "en cola", in_progress: "en curso", completed: "terminado" };
+let runsPollTimer = null;
+
+async function renderRuns() {
+  const container = el("runs-list");
+  let runs;
+  try {
+    runs = await readWorkflowRuns();
+  } catch (error) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⚠️</div>
+      <div class="empty-title">No se pudo leer el historial</div>
+      <div class="tiny">${escapeHtml(error.message)}</div></div>`;
+    return;
+  }
+
+  if (!runs.length) {
+    container.innerHTML = `<div class="empty"><div class="empty-icon">⏱️</div>
+      <div class="empty-title">Nada ejecutado todavía</div></div>`;
+    return;
+  }
+
+  container.innerHTML = runs
+    .map((run) => {
+      const isDone = run.status === "completed";
+      const badgeClass = !isDone ? "running" : run.conclusion === "success" ? "done" : "failed";
+      const label = !isDone ? RUN_LABELS[run.status] ?? run.status : run.conclusion === "success" ? "ok" : "error";
+      return `<div class="run">
+        <div class="run-head">
+          <span class="run-name">${run.event === "schedule" ? "Run diario" : "Lanzamiento manual"} #${run.run_number}</span>
+          <span class="badge ${badgeClass}">${label}</span>
+          <span class="muted tiny">${(run.created_at || "").replace("T", " ").slice(0, 16)} UTC</span>
+        </div>
+        <a class="link-btn" href="${run.html_url}" target="_blank" rel="noopener">Ver en GitHub →</a>
+      </div>`;
+    })
+    .join("");
+
+  clearTimeout(runsPollTimer);
+  if (runs.some((run) => run.status !== "completed")) {
+    runsPollTimer = setTimeout(renderRuns, 8000);
+  }
+}
+
+/* ── Tabs ───────────────────────────────────────────────────────────── */
+function showTab(name) {
+  document.querySelectorAll(".seg[data-tab]").forEach((tab) => tab.classList.toggle("active", tab.dataset.tab === name));
+  document.querySelectorAll(".panel").forEach((panel) => panel.classList.toggle("hidden", panel.id !== `tab-${name}`));
+  if (name === "listings") renderListings();
+  if (name === "searches") renderSearches();
+  if (name === "runs") renderRuns();
+  else clearTimeout(runsPollTimer);
+}
+
+document
+  .querySelectorAll(".seg[data-tab]")
+  .forEach((tab) => tab.addEventListener("click", () => showTab(tab.dataset.tab)));
 
 loadData()
   .then(() => {

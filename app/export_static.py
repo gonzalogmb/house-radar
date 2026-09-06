@@ -12,6 +12,7 @@ data/ directory, by contrast, lives on disk between requests and is gitignored.
 import asyncio
 import json
 import logging
+import os
 import sys
 import uuid
 from datetime import datetime, timezone
@@ -122,6 +123,13 @@ async def main() -> int:
         logger.error("missing %s", SEARCHES_FILE)
         return 1
     searches = json.loads(SEARCHES_FILE.read_text(encoding="utf-8"))
+
+    only_search = os.environ.get("HR_ONLY_SEARCH", "").strip()
+    if only_search:
+        searches = [s for s in searches if s["name"] == only_search]
+        if not searches:
+            logger.error("HR_ONLY_SEARCH=%r matched no saved search", only_search)
+            return 1
 
     listings, results = await scrape_all(searches)
 

@@ -15,75 +15,181 @@
           <p id="meta-line" class="muted tiny">cargando…</p>
         </div>
       </div>
-      <button id="theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">☾</button>
+      <div class="topbar-right">
+        <nav class="segmented" role="tablist">
+          <button class="seg" data-tab="searches" role="tab">Búsquedas</button>
+          <button class="seg active" data-tab="listings" role="tab">Resultados</button>
+          <button class="seg" data-tab="runs" role="tab">Ejecuciones</button>
+        </nav>
+        <button id="theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">☾</button>
+      </div>
     </header>
 
     <section id="kpis" class="kpis"></section>
 
     <div class="info-banner">
-      <span>📸 Instantánea estática, generada una vez al día por GitHub Actions — sin servidor detrás, sin scraping bajo demanda.</span>
-      <button id="run-scrape" class="btn-run" type="button" title="Solo funciona con el token del propietario del repositorio">▶ Lanzar scraping ahora</button>
-      <a href="https://github.com/gonzalogmb/house-radar" target="_blank" rel="noopener">Córrelo tú mismo con la app completa →</a>
+      <span>📸 Sin servidor propio: guardar/lanzar búsquedas escribe directamente en este repositorio vía la API de GitHub, con tu propio token.</span>
+      <a href="https://github.com/gonzalogmb/house-radar" target="_blank" rel="noopener">Ver el código →</a>
     </div>
 
     <main>
-      <div class="toolbar">
-        <div class="chips" id="quick-filters">
-          <button class="chip" data-quick="all" aria-pressed="true">Todos</button>
-          <button class="chip" data-quick="new" aria-pressed="false">✦ Nuevos</button>
-          <button class="chip" data-quick="drops" aria-pressed="false">↓ Bajadas</button>
-          <button class="chip" data-quick="sareb" aria-pressed="false">🏦 Sareb</button>
-        </div>
-        <div class="toolbar-fields">
-          <div class="field inline wide">
-            <span>Barrio</span>
-            <div class="msel" id="f-neighborhood">
-              <button type="button" class="msel-trigger">Todos los barrios</button>
-              <div class="msel-panel hidden">
-                <input type="text" class="msel-search" placeholder="Buscar barrio…" />
-                <div class="msel-actions"><button type="button" data-action="clear">Limpiar</button></div>
-                <div class="msel-groups"></div>
+      <!-- ─── Búsquedas ─────────────────────────────────────────── -->
+      <section id="tab-searches" class="panel hidden">
+        <div class="two-col">
+          <form id="search-form" class="card">
+            <div class="card-head">
+              <h2>Nueva búsqueda</h2>
+              <p class="muted tiny">Se guarda en el repositorio y entra en el run diario.</p>
+            </div>
+
+            <label class="field">
+              <span>Nombre</span>
+              <input name="name" required placeholder="Pisos en Chamberí" />
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Ubicación</span>
+                <select name="location" id="location-select"></select>
+              </label>
+              <div class="field">
+                <span>Operación</span>
+                <div class="segmented small" id="operation-toggle">
+                  <button type="button" class="seg active" data-value="venta">Comprar</button>
+                  <button type="button" class="seg" data-value="alquiler">Alquilar</button>
+                </div>
               </div>
             </div>
+
+            <div class="field">
+              <span>Portales</span>
+              <div class="chips" id="portals-field"></div>
+            </div>
+
+            <details class="advanced" open>
+              <summary>Filtros</summary>
+              <div class="field-grid">
+                <label class="field">
+                  <span>Precio mín.</span>
+                  <div class="input-affix"><input name="min_price" type="number" min="0" step="1000" placeholder="0" /><i>€</i></div>
+                </label>
+                <label class="field">
+                  <span>Precio máx.</span>
+                  <div class="input-affix"><input name="max_price" type="number" min="0" step="1000" placeholder="sin tope" /><i>€</i></div>
+                </label>
+                <label class="field">
+                  <span>Habitaciones mín.</span>
+                  <input name="min_rooms" type="number" min="0" max="10" placeholder="cualquiera" />
+                </label>
+                <label class="field">
+                  <span>Superficie mín.</span>
+                  <div class="input-affix"><input name="min_surface" type="number" min="0" step="5" placeholder="cualquiera" /><i>m²</i></div>
+                </label>
+                <label class="field">
+                  <span>Páginas por portal</span>
+                  <input name="max_pages" type="number" min="1" max="20" placeholder="3" />
+                </label>
+              </div>
+            </details>
+
+            <div class="actions">
+              <button type="submit" class="btn primary">Guardar búsqueda</button>
+            </div>
+            <p class="muted tiny">
+              Necesita tu token de GitHub (fine-grained, permisos <b>Contents</b> y
+              <b>Actions</b> en modo lectura y escritura, solo sobre este repositorio) —
+              te lo pedirá la primera vez.
+            </p>
+          </form>
+
+          <div class="card">
+            <div class="card-head">
+              <div class="actions" style="justify-content: space-between; align-items: center;">
+                <h2>Búsquedas guardadas</h2>
+                <button id="run-all" class="btn small">▶ Lanzar todas ahora</button>
+              </div>
+              <p class="muted tiny">Se ejecutan juntas en el run diario (06:00 UTC).</p>
+            </div>
+            <div id="searches-list"></div>
           </div>
-          <label class="field inline">
-            <span>Portal</span>
-            <select id="f-portal"><option value="">Todos</option></select>
-          </label>
-          <label class="field inline">
-            <span>Precio máx.</span>
-            <input id="f-max-price" type="number" step="10000" placeholder="—" />
-          </label>
-          <label class="field inline">
-            <span>Hab. mín.</span>
-            <input id="f-min-rooms" type="number" min="0" max="10" placeholder="—" />
-          </label>
-          <label class="field inline">
-            <span>m² mín.</span>
-            <input id="f-min-surface" type="number" step="5" placeholder="—" />
-          </label>
-          <label class="field inline">
-            <span>Orden</span>
-            <select id="f-order">
-              <option value="first_seen">Novedad</option>
-              <option value="price">Precio</option>
-              <option value="price_per_m2">€/m²</option>
-              <option value="surface_m2">Superficie</option>
-            </select>
-          </label>
-          <button id="sort-dir" class="icon-btn" title="Invertir orden">↓</button>
         </div>
-      </div>
+      </section>
 
-      <p id="listings-count" class="muted tiny count-line"></p>
-      <div id="listings-grid" class="grid-cards"></div>
+      <!-- ─── Resultados ────────────────────────────────────────── -->
+      <section id="tab-listings" class="panel">
+        <div class="toolbar">
+          <div class="chips" id="quick-filters">
+            <button class="chip" data-quick="all" aria-pressed="true">Todos</button>
+            <button class="chip" data-quick="new" aria-pressed="false">✦ Nuevos</button>
+            <button class="chip" data-quick="drops" aria-pressed="false">↓ Bajadas</button>
+            <button class="chip" data-quick="sareb" aria-pressed="false">🏦 Sareb</button>
+          </div>
+          <div class="toolbar-fields">
+            <div class="field inline wide">
+              <span>Barrio</span>
+              <div class="msel" id="f-neighborhood">
+                <button type="button" class="msel-trigger">Todos los barrios</button>
+                <div class="msel-panel hidden">
+                  <input type="text" class="msel-search" placeholder="Buscar barrio…" />
+                  <div class="msel-actions"><button type="button" data-action="clear">Limpiar</button></div>
+                  <div class="msel-groups"></div>
+                </div>
+              </div>
+            </div>
+            <label class="field inline">
+              <span>Portal</span>
+              <select id="f-portal"><option value="">Todos</option></select>
+            </label>
+            <label class="field inline">
+              <span>Precio máx.</span>
+              <input id="f-max-price" type="number" step="10000" placeholder="—" />
+            </label>
+            <label class="field inline">
+              <span>Hab. mín.</span>
+              <input id="f-min-rooms" type="number" min="0" max="10" placeholder="—" />
+            </label>
+            <label class="field inline">
+              <span>m² mín.</span>
+              <input id="f-min-surface" type="number" step="5" placeholder="—" />
+            </label>
+            <label class="field inline">
+              <span>Orden</span>
+              <select id="f-order">
+                <option value="first_seen">Novedad</option>
+                <option value="price">Precio</option>
+                <option value="price_per_m2">€/m²</option>
+                <option value="surface_m2">Superficie</option>
+              </select>
+            </label>
+            <button id="sort-dir" class="icon-btn" title="Invertir orden">↓</button>
+          </div>
+        </div>
 
-      <p class="footnote">
-        Datos de Fotocasa y pisos.com, uso personal · código en
-        <a href="https://github.com/gonzalogmb/house-radar" target="_blank" rel="noopener">GitHub</a>
-      </p>
+        <p id="listings-count" class="muted tiny count-line"></p>
+        <div id="listings-grid" class="grid-cards"></div>
+
+        <p class="footnote">
+          Datos de Fotocasa y pisos.com, uso personal · código en
+          <a href="https://github.com/gonzalogmb/house-radar" target="_blank" rel="noopener">GitHub</a>
+        </p>
+      </section>
+
+      <!-- ─── Ejecuciones ───────────────────────────────────────── -->
+      <section id="tab-runs" class="panel hidden">
+        <div class="card">
+          <div class="card-head">
+            <h2>Ejecuciones</h2>
+            <p class="muted tiny">
+              Historial real de GitHub Actions (público, no hace falta token para verlo).
+              Cada lanzamiento tarda 1-2 min en encolarse y correr.
+            </p>
+          </div>
+          <div id="runs-list"></div>
+        </div>
+      </section>
     </main>
 
+    <div id="toasts" class="toasts"></div>
     <script src="app.js"></script>
   </body>
 </html>

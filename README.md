@@ -52,25 +52,33 @@ ningún sitio ni factura de por medio:
   `site/history.parquet` (committeado — un runner de Actions no persiste nada entre
   ejecuciones, así que el histórico vive en el propio repo) y escribe
   [`docs/data.json`](docs/data.json).
-- `docs/` es una página estática (sin FastAPI, sin Python en el navegador) que lee ese
-  JSON y filtra/ordena en el cliente. La sirve GitHub Pages: gratis para siempre, no se
-  duerme, no tiene disco que pagar.
-- No hay pestaña de Ejecuciones en vivo — no hay servidor que lleve la cuenta de un run
-  mientras ocurre — pero sí un botón **"Lanzar scraping ahora"** en la propia página.
-  Como no hay backend, ese botón le pide a la API de GitHub que dispare el workflow
-  (exactamente lo mismo que hace `workflow_dispatch` desde la pestaña Actions, solo que
-  sin salir de la web). La página es pública y cualquiera ve el botón, pero solo
-  funciona para quien tenga un token con permiso de escritura sobre las Actions de
-  este repo — la primera vez que lo pulsas te lo pide, y se queda guardado únicamente
-  en tu navegador (`localStorage`), sin pasar por ningún otro sitio que no sea
-  `api.github.com`. Un visitante sin ese token solo consigue un cuadro de diálogo
-  pidiéndoselo, y no puede hacer nada con él.
-
-  Para generarte el token: GitHub → tu avatar → **Settings → Developer settings →
-  Personal access tokens → Fine-grained tokens → Generate new token**. Limítalo a
-  **Only select repositories** → `house-radar`, y en **Repository permissions** dale
-  a **Actions: Read and write** (nada más). Cópialo y pégalo la primera vez que pulses
-  el botón. Si alguna vez quieres revocarlo, es la misma pantalla.
+- `docs/` es una página estática (sin FastAPI, sin Python en el navegador) que lee
+  [`docs/data.json`](docs/data.json) y filtra/ordena en el cliente para **Resultados**.
+  La sirve GitHub Pages: gratis para siempre, no se duerme, no tiene disco que pagar.
+- **Búsquedas** y **Ejecuciones** sí están completas ahí, apoyadas en la propia API de
+  GitHub en vez de un backend:
+  - *Ver* (lista de búsquedas guardadas, historial de Ejecuciones) es una lectura sin
+    autenticar — funciona para cualquier visitante, porque el repo es público.
+  - *Guardar/borrar una búsqueda* escribe directamente en
+    [`site/searches.json`](site/searches.json) vía la API de contenidos de GitHub (un
+    commit por cambio). *Lanzar* (una búsqueda o todas) dispara el mismo
+    `workflow_dispatch` que la pestaña Actions, con un input opcional para decirle que
+    corra solo una búsqueda por nombre.
+  - Todo eso escribe, así que pide un token la primera vez. Se guarda solo en tu
+    navegador (`localStorage`) y se manda directo a `api.github.com` — nunca a ningún
+    otro sitio. Cualquiera puede ver el botón, pero sin tu token GitHub responde
+    401/403 y la página no deja pasar nada; no hay manera de que un visitante sin él
+    guarde, borre o lance algo.
+  - Para generarte el token: GitHub → tu avatar → **Settings → Developer settings →
+    Personal access tokens → Fine-grained tokens → Generate new token**. Limítalo a
+    **Only select repositories** → `house-radar`, y en **Repository permissions** dale
+    a **Contents: Read and write** y **Actions: Read and write**. Cópialo y pégalo la
+    primera vez que guardes o lances algo. Si alguna vez quieres revocarlo, es la misma
+    pantalla.
+  - Sin servidor propio, "Ejecuciones" no es tiempo real: lanzar algo tarda 1-2 min en
+    encolarse y correr en un runner de Actions; la pestaña muestra `en cola`/`en
+    curso`/`ok`/`error` con un enlace a los logs completos en GitHub, no una barra de
+    progreso al segundo.
 
 Puesta en marcha (una sola vez):
 
