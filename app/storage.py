@@ -118,6 +118,38 @@ def load_listings(
     return frame
 
 
+def load_listings_enriched(portal: str | None = None, search_id: str | None = None) -> pd.DataFrame:
+    """Latest snapshot per listing plus what only the history can tell: when it first
+    showed up and how the price moved since the previous run."""
+    history = load_listings(portal=portal, latest_only=False)
+    if history.empty:
+        return history
+
+    history = history.sort_values("scraped_at")
+    keys = ["portal", "listing_id"]
+    history["_rank"] = history.groupby(keys).cumcount(ascending=False)
+
+    latest = history[history["_rank"] == 0].drop(columns="_rank")
+    previous = history[history["_rank"] == 1][keys + ["price"]].rename(
+        columns={"price": "previous_snapshot_price"}
+    )
+    aggregates = (
+        history.groupby(keys)
+        .agg(first_seen=("scraped_at", "min"), snapshots=("scraped_at", "count"))
+        .reset_index()
+    )
+
+    frame = latest.merge(previous, on=keys, how="left").merge(aggregates, on=keys, how="left")
+    frame["price_delta"] = frame["price"] - frame["previous_snapshot_price"]
+
+    last_pass = frame["scraped_at"].max()
+    frame["is_new"] = frame["first_seen"].dt.date == last_pass.date()
+
+    if search_id:
+        frame = frame[frame["search_id"] == search_id]
+    return frame.reset_index(drop=True)
+
+
 def price_history(portal: str, listing_id: str) -> pd.DataFrame:
     frame = load_listings(portal=portal, latest_only=False)
     if frame.empty:

@@ -19,7 +19,7 @@ from app.scheduler import build_scheduler
 from app.scrapers import PORTALS, scraper_for
 from app.storage import (
     delete_search,
-    load_listings,
+    load_listings_enriched,
     load_runs,
     load_searches,
     price_history,
@@ -129,14 +129,19 @@ async def list_listings(
     max_price: float | None = None,
     min_rooms: int | None = None,
     min_surface: float | None = None,
-    order_by: str = Query("scraped_at", pattern="^(price|price_per_m2|surface_m2|scraped_at|published_at)$"),
+    only_new: bool = False,
+    only_drops: bool = False,
+    order_by: str = Query(
+        "first_seen", pattern="^(price|price_per_m2|surface_m2|scraped_at|published_at|first_seen)$"
+    ),
     ascending: bool = False,
     limit: int = 200,
 ) -> dict:
-    frame = load_listings(portal=portal, search_id=search_id)
+    frame = load_listings_enriched(portal=portal, search_id=search_id)
     if frame.empty:
-        return {"total": 0, "items": []}
+        return {"total": 0, "matched": 0, "items": []}
 
+    total = len(frame)
     if min_price is not None:
         frame = frame[frame["price"] >= min_price]
     if max_price is not None:
@@ -145,10 +150,14 @@ async def list_listings(
         frame = frame[frame["rooms"] >= min_rooms]
     if min_surface is not None:
         frame = frame[frame["surface_m2"] >= min_surface]
+    if only_new:
+        frame = frame[frame["is_new"]]
+    if only_drops:
+        frame = frame[frame["price_delta"] < 0]
 
-    total = len(frame)
+    matched = len(frame)
     frame = frame.sort_values(order_by, ascending=ascending, na_position="last").head(limit)
-    return {"total": total, "items": _to_records(frame)}
+    return {"total": total, "matched": matched, "items": _to_records(frame)}
 
 
 @app.get("/api/listings/{portal}/{listing_id}/history")
@@ -159,16 +168,17 @@ async def listing_history(portal: str, listing_id: str) -> dict:
 
 @app.get("/api/stats")
 async def stats() -> dict:
-    frame = load_listings()
-    runs = load_runs(10)
+    frame = load_listings_enriched()
     if frame.empty:
-        return {"total_listings": 0, "by_portal": {}, "recent_runs": runs}
+        return {"total_listings": 0, "by_portal": {}, "new_listings": 0, "price_drops": 0}
     return {
         "total_listings": int(len(frame)),
         "by_portal": frame["portal"].value_counts().to_dict(),
+        "new_listings": int(frame["is_new"].sum()),
+        "price_drops": int((frame["price_delta"] < 0).sum()),
         "median_price": _safe_float(frame["price"].median()),
         "median_price_per_m2": _safe_float(frame["price_per_m2"].median()),
-        "recent_runs": runs,
+        "last_scrape": _safe_iso(frame["scraped_at"].max()),
     }
 
 
@@ -181,3 +191,7 @@ def _to_records(frame: pd.DataFrame) -> list[dict]:
 
 def _safe_float(value) -> float | None:
     return None if pd.isna(value) else round(float(value), 2)
+
+
+def _safe_iso(value) -> str | None:
+    return None if pd.isna(value) else value.strftime("%Y-%m-%dT%H:%M:%SZ")

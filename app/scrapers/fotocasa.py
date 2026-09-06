@@ -90,11 +90,18 @@ class FotocasaScraper(BaseScraper):
             advertiser_type=item.get("clientType"),
             advertiser_name=item.get("clientAlias"),
             description=(item.get("description") or "").strip() or None,
-            thumbnail=multimedia[0]["src"] if multimedia else None,
+            thumbnail=_thumbnail(multimedia),
             n_images=len(multimedia) or None,
             published_at=_from_timestamp((item.get("date") or {}).get("timestamp")),
             is_new_construction=item.get("isNewConstruction"),
         )
+
+
+def _thumbnail(multimedia: list[dict]) -> str | None:
+    """`rule=original` is a 1440px 110 KB photo; the cards want the 320px 8 KB one."""
+    if not multimedia:
+        return None
+    return multimedia[0]["src"].replace("rule=original", "rule=medium")
 
 
 def _as_float(value) -> float | None:

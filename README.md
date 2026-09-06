@@ -44,7 +44,10 @@ Los datos persisten en `./data`, montado como volumen.
 
 - **Búsquedas**: defines ubicación, operación, precio, habitaciones, superficie y portales.
   Puedes guardarla (entra en el run diario) o lanzarla al momento.
-- **Resultados**: tabla de todo lo almacenado, con €/m², filtros y ordenación.
+- **Resultados**: tarjetas con foto, precio, €/m² y zona. Los anuncios vistos por primera
+  vez en la última pasada llevan distintivo **Nuevo**, y los que han cambiado de precio
+  muestran la diferencia; filtros rápidos para ver solo unos u otros. Al pulsar en el pie
+  de una tarjeta se abre su histórico de precio.
 - **Ejecuciones**: estado en vivo de cada run, anuncios nuevos, bajadas de precio, y qué
   falló en cada portal.
 
