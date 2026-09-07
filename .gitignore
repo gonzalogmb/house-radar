@@ -6,3 +6,7 @@ __pycache__/
 .env
 .pytest_cache/
 .DS_Store
+
+# Claude Code local config/notes — kept local only, never in the public repo
+CLAUDE.md
+.claude/
