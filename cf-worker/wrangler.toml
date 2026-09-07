@@ -6,7 +6,7 @@ compatibility_date = "2025-01-01"
 # Public by nature (it's meant to be embedded in frontend code, same as any
 # OAuth app's client ID). The real secrets are set below with `wrangler secret
 # put` — never in this file, never in git.
-GH_OAUTH_CLIENT_ID = "REPLACE_WITH_YOUR_GITHUB_OAUTH_APP_CLIENT_ID"
+GH_OAUTH_CLIENT_ID = "Iv23li70wXElgGvynH3v"
 ALLOWED_ORIGIN = "https://radar.gonzalomartinezberzal.com"
 
 # wrangler secret put GH_OAUTH_CLIENT_SECRET
