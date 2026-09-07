@@ -81,49 +81,100 @@ async function readSearchesFile() {
   return { sha: data.sha, searches: JSON.parse(base64ToUtf8(data.content)) };
 }
 
-/* ── Google Sign-In + the Worker for writes ─────────────────────────────
+/* ── Login with GitHub + the Worker for writes ──────────────────────────
    Every write (save/delete a search, launch a scrape) goes through a small
    Cloudflare Worker instead of straight to GitHub. The Worker holds the
-   real GitHub token as a server-side secret — it never reaches this page —
-   and only acts after verifying, itself, that the Google ID token we send
-   it really was issued to gonzalomartinezberzal's own Google account. A
-   visitor who isn't signed in as that account gets nothing: the client-side
-   check below is just a friendlier error message, not the actual gate. */
+   real GitHub token (GITHUB_TOKEN, write access to this repo) as a
+   server-side secret that never reaches this page.
+   Signing in gets the browser a MUCH weaker credential instead: a GitHub
+   OAuth access token scoped to `read:user`, which can't write anything.
+   Getting it takes a real redirect to github.com and back (the code->token
+   exchange needs a client secret, which is why the Worker does it, not this
+   page). On every write, the Worker calls GitHub's own /user endpoint with
+   that token to check the login is exactly ALLOWED_LOGIN before it reaches
+   for its own secret. A visitor who isn't signed in as that account gets
+   nothing: the client-side check below is just a friendlier error message,
+   not the actual gate. */
 const WORKER_URL = "https://house-radar-gate.YOUR_SUBDOMAIN.workers.dev"; // set after deploying the Worker
-const GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"; // must match cf-worker/wrangler.toml
+const GH_OAUTH_CLIENT_ID = "REPLACE_WITH_YOUR_GITHUB_OAUTH_APP_CLIENT_ID"; // must match cf-worker/wrangler.toml
+const SESSION_KEY = "hr-gh-session";
+const OAUTH_STATE_KEY = "hr-gh-oauth-state";
 
-let currentCredential = null;
-
-function decodeJwtPayload(token) {
-  const base64 = token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/");
-  return JSON.parse(decodeURIComponent(escape(atob(base64))));
+let currentSession = null; // { access_token, login }
+try {
+  currentSession = JSON.parse(sessionStorage.getItem(SESSION_KEY) || "null");
+} catch {
+  /* private mode: just start signed out */
 }
 
-function handleCredentialResponse(response) {
-  currentCredential = response.credential;
-  const { email } = decodeJwtPayload(response.credential);
-  el("auth-email").textContent = email;
+function showSignedIn(session) {
+  el("auth-login").textContent = session.login;
   el("auth-signed-out").classList.add("hidden");
   el("auth-signed-in").classList.remove("hidden");
 }
 
+function beginSignIn() {
+  const state = crypto.randomUUID();
+  try {
+    sessionStorage.setItem(OAUTH_STATE_KEY, state);
+  } catch {
+    /* if this fails, the callback below will too and just show an error */
+  }
+  const redirectUri = `${location.origin}${location.pathname}`;
+  const params = new URLSearchParams({
+    client_id: GH_OAUTH_CLIENT_ID,
+    scope: "read:user",
+    redirect_uri: redirectUri,
+    state,
+  });
+  location.href = `https://github.com/login/oauth/authorize?${params}`;
+}
+
+async function finishSignIn(code, state) {
+  let expectedState = null;
+  try {
+    expectedState = sessionStorage.getItem(OAUTH_STATE_KEY);
+    sessionStorage.removeItem(OAUTH_STATE_KEY);
+  } catch {
+    /* ignore */
+  }
+  if (!expectedState || state !== expectedState) {
+    toast("Inicio de sesión inválido (state no coincide) — inténtalo de nuevo.", "error");
+    return;
+  }
+  try {
+    const data = await workerRequest("/auth/callback", { code });
+    currentSession = { access_token: data.access_token, login: data.login };
+    try {
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify(currentSession));
+    } catch {
+      /* still works for the rest of this page load even if it can't persist */
+    }
+    showSignedIn(currentSession);
+    showTab("searches");
+  } catch (error) {
+    toast(`No se pudo iniciar sesión: ${error.message}`, "error");
+  }
+}
+
 function signOut() {
-  currentCredential = null;
-  window.google?.accounts?.id?.disableAutoSelect();
+  currentSession = null;
+  try {
+    sessionStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* ignore */
+  }
   el("auth-signed-in").classList.add("hidden");
   el("auth-signed-out").classList.remove("hidden");
 }
 
+el("github-signin-button").addEventListener("click", beginSignIn);
 el("auth-signout").addEventListener("click", signOut);
-
-if (window.google?.accounts?.id) {
-  google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: handleCredentialResponse });
-  google.accounts.id.renderButton(el("google-signin-button"), { theme: "filled_black", size: "medium", text: "signin" });
-}
+if (currentSession) showSignedIn(currentSession);
 
 function requireSignIn() {
-  if (!currentCredential) throw new Error("Inicia sesión con Google primero.");
-  return currentCredential;
+  if (!currentSession) throw new Error("Inicia sesión con GitHub primero.");
+  return currentSession.access_token;
 }
 
 async function workerRequest(path, body) {
@@ -666,3 +717,15 @@ loadData()
       <div class="tiny">Puede que el primer run de GitHub Actions todavía no se haya ejecutado.</div>
     </div>`;
   });
+
+/* If we just landed back here from GitHub's login redirect, finish signing in
+   and strip ?code=&state= from the address bar either way. */
+{
+  const params = new URLSearchParams(location.search);
+  const code = params.get("code");
+  const state = params.get("state");
+  if (code && state) {
+    history.replaceState(null, "", location.pathname);
+    finishSignIn(code, state);
+  }
+}

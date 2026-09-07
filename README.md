@@ -64,18 +64,20 @@ ningún sitio ni factura de por medio:
     commit por cambio). *Lanzar* (una búsqueda o todas) dispara el mismo
     `workflow_dispatch` que la pestaña Actions, con un input opcional para decirle que
     corra solo una búsqueda por nombre.
-  - Todo eso escribe, así que exige iniciar sesión con **Google** primero (botón
-    "Iniciar sesión" en la pestaña Búsquedas) — y no con cualquier cuenta: tiene que
-    ser exactamente `gonzalogmb@gmail.com`. Esa comprobación no la hace el
+  - Todo eso escribe, así que exige iniciar sesión con **GitHub** primero (botón
+    "Iniciar sesión con GitHub" en la pestaña Búsquedas) — y no con cualquier
+    cuenta: tiene que ser exactamente `gonzalogmb`. Esa comprobación no la hace el
     navegador: la hace [`cf-worker/worker.js`](cf-worker/worker.js), una función
     Cloudflare Workers (gratis) que se interpone entre la página y GitHub. El
-    navegador nunca ve ni guarda el token de GitHub — vive únicamente como secreto
-    de ese Worker. Lo que la página manda al Worker es el token de identidad que
-    entrega Google al iniciar sesión; el Worker verifica su firma contra las claves
-    públicas de Google, comprueba emisor/audiencia/caducidad, y solo si el email
-    verificado es el tuyo llama a GitHub con su propio secreto. Así que ni abriendo
-    la consola del navegador se puede falsificar esto: sin haber iniciado sesión de
-    verdad como esa cuenta de Google, el Worker rechaza la petición.
+    navegador nunca ve ni guarda el token que de verdad puede escribir en el repo
+    (`GITHUB_TOKEN`) — vive únicamente como secreto de ese Worker. Lo que recibe
+    el navegador al iniciar sesión es un token de OAuth de GitHub mucho más
+    débil, con permiso de solo lectura (`read:user`) — no puede escribir nada por
+    sí mismo. En cada acción, el Worker llama al propio `/user` de GitHub con ese
+    token para comprobar que el usuario es exactamente `gonzalogmb`, y solo
+    entonces usa su secreto de verdad. Así que ni abriendo la consola del
+    navegador se puede falsificar esto: sin haber iniciado sesión de verdad como
+    esa cuenta, el Worker rechaza la petición.
   - Sin servidor propio, "Ejecuciones" no es tiempo real: lanzar algo tarda 1-2 min en
     encolarse y correr en un runner de Actions; la pestaña muestra `en cola`/`en
     curso`/`ok`/`error` con un enlace a los logs completos en GitHub, no una barra de
@@ -100,46 +102,58 @@ Puesta en marcha (una sola vez):
    `site/searches.json` — es una lista de `{name, criteria}` con la misma forma que
    `SearchCriteria` (ver `app/models.py`).
 
-#### Login con Google (para poder guardar/lanzar/borrar desde la web)
+#### Login con GitHub (para poder guardar/lanzar/borrar desde la web)
 
-Dos piezas nuevas, las dos gratis: un Client ID de OAuth de Google (para que la
-página pueda pedir "inicia sesión con Google") y un Cloudflare Worker (para
-verificarlo de verdad y guardar el token de GitHub fuera del navegador).
+Dos piezas nuevas, las dos gratis: una OAuth App de GitHub (para que la página
+pueda pedir "inicia sesión con GitHub") y un Cloudflare Worker (para
+verificarlo de verdad y guardar el token que escribe de verdad fuera del
+navegador).
 
-**1. Client ID de Google:**
+**1. OAuth App de GitHub:**
 
-1. [Google Cloud Console](https://console.cloud.google.com/) → crea un proyecto
-   (o usa uno existente) → **APIs & Services → Credentials → Create Credentials →
-   OAuth client ID** → tipo **Web application**.
-2. En **Authorized JavaScript origins** añade `https://radar.gonzalomartinezberzal.com`
-   (y `http://localhost:8001` o el puerto que uses si quieres probarlo en local).
-3. No hace falta configurar una pantalla de consentimiento pública ni verificarla
-   — con que tu propia cuenta de Google pueda usarlo basta (modo "Testing" en
-   OAuth consent screen, añadiéndote a ti mismo como test user, es suficiente).
-4. Copia el **Client ID** (termina en `.apps.googleusercontent.com`). No es
-   secreto — está pensado para ir embebido en el frontend.
+1. GitHub → tu avatar → **Settings → Developer settings → OAuth Apps → New
+   OAuth App**.
+2. **Application name**: lo que quieras, p. ej. "House Radar login".
+3. **Homepage URL**: `https://radar.gonzalomartinezberzal.com`.
+4. **Authorization callback URL**: `https://radar.gonzalomartinezberzal.com/`
+   (tiene que ser exactamente esa — GitHub solo permite una por app; si quieres
+   probarlo también en local necesitarías una segunda OAuth App con
+   `http://localhost:8001/` como callback).
+5. Register application.
+6. Copia el **Client ID** que te muestra. No es secreto — va embebido en el
+   frontend igual que en `market-analysis`/etc.
+7. **Generate a new client secret** → cópialo también. Este sí es secreto: va
+   solo en el Worker, nunca en el repo.
 
 **2. Cloudflare Worker:**
 
 1. Crea una cuenta gratuita en [Cloudflare](https://dash.cloudflare.com/sign-up) si
    no tienes.
 2. Instala Wrangler (`npm install -g wrangler`) y autentícate (`wrangler login`).
-3. En `cf-worker/wrangler.toml`, sustituye `GOOGLE_CLIENT_ID` por el Client ID del
-   paso anterior (y `ALLOWED_ORIGIN` si tu dominio es otro).
-4. Desde `cf-worker/`, define el secreto real (nunca va en el `.toml` ni en git):
+3. En `cf-worker/wrangler.toml`, sustituye `GH_OAUTH_CLIENT_ID` por el Client ID
+   del paso anterior (y `ALLOWED_ORIGIN` si tu dominio es otro).
+4. Desde `cf-worker/`, define los dos secretos reales (nunca van en el `.toml`
+   ni en git):
+   ```
+   wrangler secret put GH_OAUTH_CLIENT_SECRET
+   ```
+   (pega el client secret del paso 1.7)
    ```
    wrangler secret put GITHUB_TOKEN
    ```
-   Pégale un token fine-grained de GitHub limitado a `house-radar`, con
-   **Contents: Read and write** y **Actions: Read and write**.
+   (pega un token fine-grained de GitHub limitado a `house-radar`, con
+   **Contents: Read and write** y **Actions: Read and write** — este es el que
+   de verdad escribe en el repo, distinto del OAuth App de arriba)
 5. Despliega: `wrangler deploy` (desde `cf-worker/`). Te da una URL del tipo
    `https://house-radar-gate.<tu-subdominio>.workers.dev`.
 6. En [`docs/app.js`](docs/app.js), sustituye las constantes `WORKER_URL` y
-   `GOOGLE_CLIENT_ID` por los valores reales de los pasos 5 y 1. Haz commit y push.
+   `GH_OAUTH_CLIENT_ID` por los valores reales de los pasos 5 y 1.6. Haz commit
+   y push.
 
-A partir de aquí, el botón "Iniciar sesión" de la pestaña Búsquedas solo deja
-guardar/lanzar/borrar cuando entras con `gonzalogmb@gmail.com` — cualquier otra
-cuenta, o no haber iniciado sesión, hace que el Worker rechace la petición.
+A partir de aquí, el botón "Iniciar sesión con GitHub" de la pestaña Búsquedas
+solo deja guardar/lanzar/borrar cuando entras con la cuenta `gonzalogmb` —
+cualquier otra cuenta, o no haber iniciado sesión, hace que el Worker rechace
+la petición.
 
 ### Desplegar en Render (app completa e interactiva, de pago)
 

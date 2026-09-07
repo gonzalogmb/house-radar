@@ -5,101 +5,31 @@
  * dispatching the scrape workflow, adding or removing a saved search — is
  * routed through this Worker instead of going straight to GitHub's API from
  * the browser. That's the whole point of it: a GitHub token good enough to
- * write to the repo lives ONLY in this Worker's secrets, never in a browser,
- * never in localStorage, never in the page's source. A visitor's browser
- * only ever holds a short-lived Google ID token, which proves who they
- * signed in as — it grants nothing on GitHub by itself.
+ * write to the repo (GITHUB_TOKEN) lives ONLY in this Worker's secrets,
+ * never in a browser, never in localStorage, never in the page's source.
  *
- * Every write request must carry a Google ID token (`credential`) that this
- * Worker verifies itself: signature against Google's own public keys,
- * issuer, audience, expiry, and that the verified email is an exact match
- * for ALLOWED_EMAIL. Only then does it use its own GITHUB_TOKEN secret to
- * act on GitHub. Reads (the saved-search list, run history, data.json) stay
- * direct, unauthenticated calls from the browser to GitHub's public API —
- * there's nothing to protect there, so they don't go through this Worker.
+ * Sign-in is "Login with GitHub" (a separate, much less powerful credential):
+ * the browser gets an authorization `code` from GitHub's own login page,
+ * this Worker exchanges it server-side for a short-lived access token (that
+ * exchange needs GH_OAUTH_CLIENT_SECRET, which is why it can't happen in the
+ * browser), and hands that access token back to the page to use as its
+ * "credential" on write calls. That token only ever proves who's asking —
+ * it was requested with `scope=read:user` and can't write anything on
+ * GitHub by itself. On every write request this Worker calls GitHub's own
+ * `/user` endpoint with it to check the login is exactly ALLOWED_LOGIN,
+ * and only then reaches for GITHUB_TOKEN to actually act. Reads (the
+ * saved-search list, run history, data.json) stay direct, unauthenticated
+ * calls from the browser to GitHub's public API — there's nothing to
+ * protect there, so they don't go through this Worker at all.
  *
- * Deploy: see the "Login con Google" section in README.md.
+ * Deploy: see the "Login con GitHub" section in README.md.
  */
 
 const GH_OWNER = "gonzalogmb";
 const GH_REPO = "house-radar";
 const GH_WORKFLOW = "daily-scrape.yml";
-const ALLOWED_EMAIL = "gonzalogmb@gmail.com";
+const ALLOWED_LOGIN = "gonzalogmb";
 const GH_API = "https://api.github.com";
-const GOOGLE_JWKS_URL = "https://www.googleapis.com/oauth2/v3/certs";
-
-let jwksCache = null;
-let jwksCachedAt = 0;
-
-async function fetchGoogleJwks() {
-  if (jwksCache && Date.now() - jwksCachedAt < 3600_000) return jwksCache;
-  const response = await fetch(GOOGLE_JWKS_URL);
-  if (!response.ok) throw new Error("could not fetch Google's public keys");
-  jwksCache = await response.json();
-  jwksCachedAt = Date.now();
-  return jwksCache;
-}
-
-function base64UrlToBytes(value) {
-  const padded = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(value.length + ((4 - (value.length % 4)) % 4), "=");
-  const binary = atob(padded);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-  return bytes;
-}
-
-function base64UrlToString(value) {
-  return new TextDecoder().decode(base64UrlToBytes(value));
-}
-
-/** Verifies a Google ID token end to end and returns its payload — throws on anything wrong. */
-async function verifyGoogleIdToken(idToken, expectedAudience) {
-  if (!idToken || typeof idToken !== "string") throw new Error("missing credential");
-  const parts = idToken.split(".");
-  if (parts.length !== 3) throw new Error("malformed token");
-  const [headerB64, payloadB64, signatureB64] = parts;
-
-  const header = JSON.parse(base64UrlToString(headerB64));
-  const payload = JSON.parse(base64UrlToString(payloadB64));
-
-  if (header.alg !== "RS256") throw new Error("unexpected algorithm");
-  if (payload.iss !== "https://accounts.google.com" && payload.iss !== "accounts.google.com") {
-    throw new Error("unexpected issuer");
-  }
-  if (payload.aud !== expectedAudience) throw new Error("unexpected audience");
-  if (typeof payload.exp !== "number" || payload.exp * 1000 < Date.now()) throw new Error("token expired");
-
-  const jwks = await fetchGoogleJwks();
-  const jwk = jwks.keys.find((key) => key.kid === header.kid);
-  if (!jwk) throw new Error("unknown signing key");
-
-  const cryptoKey = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, [
-    "verify",
-  ]);
-  const signedData = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
-  const signature = base64UrlToBytes(signatureB64);
-  const valid = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", cryptoKey, signature, signedData);
-  if (!valid) throw new Error("bad signature");
-
-  return payload;
-}
-
-async function requireOwner(request, env) {
-  const body = await request.json();
-  const payload = await verifyGoogleIdToken(body.credential, env.GOOGLE_CLIENT_ID);
-  if (!payload.email_verified || payload.email !== ALLOWED_EMAIL) {
-    throw new Error(`not authorized: signed in as ${payload.email ?? "unknown"}`);
-  }
-  return body;
-}
-
-function encodeBase64(str) {
-  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
-}
-
-function decodeBase64(b64) {
-  return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
-}
 
 async function githubRequest(env, path, options = {}) {
   return fetch(`${GH_API}${path}`, {
@@ -112,6 +42,56 @@ async function githubRequest(env, path, options = {}) {
       ...(options.headers || {}),
     },
   });
+}
+
+/** Who does this access token belong to, according to GitHub itself? */
+async function githubLogin(accessToken) {
+  const response = await fetch(`${GH_API}/user`, {
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      Accept: "application/vnd.github+json",
+      "User-Agent": "house-radar-gate-worker",
+    },
+  });
+  if (!response.ok) throw new Error("invalid or expired GitHub session");
+  const user = await response.json();
+  return user.login;
+}
+
+/** Step 1 of login: trade the one-time `code` from GitHub's redirect for an access token. */
+async function exchangeCodeForToken(env, code) {
+  const response = await fetch("https://github.com/login/oauth/access_token", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      client_id: env.GH_OAUTH_CLIENT_ID,
+      client_secret: env.GH_OAUTH_CLIENT_SECRET,
+      code,
+    }),
+  });
+  const data = await response.json();
+  if (!data.access_token) {
+    throw new Error(data.error_description || "GitHub no devolvió un token de acceso");
+  }
+  return data.access_token;
+}
+
+/** Every write endpoint calls this first — throws unless the caller really is ALLOWED_LOGIN. */
+async function requireOwner(request) {
+  const body = await request.json();
+  const login = await githubLogin(body.credential);
+  if (login !== ALLOWED_LOGIN) {
+    throw new Error(`not authorized: signed in as ${login}`);
+  }
+  return body;
+}
+
+function encodeBase64(str) {
+  return btoa(String.fromCharCode(...new TextEncoder().encode(str)));
+}
+
+function decodeBase64(b64) {
+  return new TextDecoder().decode(Uint8Array.from(atob(b64), (c) => c.charCodeAt(0)));
 }
 
 async function readSearchesFile(env) {
@@ -162,8 +142,15 @@ export default {
         return new Response(JSON.stringify({ error: "method not allowed" }), { status: 405, headers });
       }
 
+      if (pathname === "/auth/callback") {
+        const { code } = await request.json();
+        const accessToken = await exchangeCodeForToken(env, code);
+        const login = await githubLogin(accessToken);
+        return new Response(JSON.stringify({ access_token: accessToken, login }), { headers });
+      }
+
       if (pathname === "/dispatch") {
-        const body = await requireOwner(request, env);
+        const body = await requireOwner(request);
         const response = await githubRequest(
           env,
           `/repos/${GH_OWNER}/${GH_REPO}/actions/workflows/${GH_WORKFLOW}/dispatches`,
@@ -183,7 +170,7 @@ export default {
       }
 
       if (pathname === "/searches/add") {
-        const body = await requireOwner(request, env);
+        const body = await requireOwner(request);
         const { sha, searches } = await readSearchesFile(env);
         searches.push(body.search);
         await writeSearchesFile(env, searches, sha, `Add search: ${body.search.name}`);
@@ -191,7 +178,7 @@ export default {
       }
 
       if (pathname === "/searches/delete") {
-        const body = await requireOwner(request, env);
+        const body = await requireOwner(request);
         const { sha, searches } = await readSearchesFile(env);
         const remaining = searches.filter((search) => search.name !== body.name);
         await writeSearchesFile(env, remaining, sha, `Remove search: ${body.name}`);

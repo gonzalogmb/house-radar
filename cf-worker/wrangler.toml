@@ -3,11 +3,19 @@ main = "worker.js"
 compatibility_date = "2025-01-01"
 
 [vars]
-# Public by nature (it's meant to be embedded in frontend code) — the real
-# secret is GITHUB_TOKEN below, set separately as a Worker secret.
-GOOGLE_CLIENT_ID = "REPLACE_WITH_YOUR_GOOGLE_OAUTH_CLIENT_ID"
+# Public by nature (it's meant to be embedded in frontend code, same as any
+# OAuth app's client ID). The real secrets are set below with `wrangler secret
+# put` — never in this file, never in git.
+GH_OAUTH_CLIENT_ID = "REPLACE_WITH_YOUR_GITHUB_OAUTH_APP_CLIENT_ID"
 ALLOWED_ORIGIN = "https://radar.gonzalomartinezberzal.com"
 
-# Set with: wrangler secret put GITHUB_TOKEN
-# A fine-grained PAT scoped to only this repo, with Contents: Read and write
-# and Actions: Read and write. Never put it in this file or in git.
+# wrangler secret put GH_OAUTH_CLIENT_SECRET
+#   The OAuth App's client secret (GitHub Settings -> Developer settings ->
+#   OAuth Apps -> your app). Needed to exchange a login `code` for an access
+#   token; must never reach the browser.
+#
+# wrangler secret put GITHUB_TOKEN
+#   A fine-grained PAT scoped to only this repo, with Contents: Read and
+#   write and Actions: Read and write. This is what actually performs writes
+#   once a caller has proven they're ALLOWED_LOGIN — a separate, far more
+#   powerful credential than the OAuth token above, kept only here.
