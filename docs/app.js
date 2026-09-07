@@ -95,7 +95,7 @@ async function readSearchesFile() {
    for its own secret. A visitor who isn't signed in as that account gets
    nothing: the client-side check below is just a friendlier error message,
    not the actual gate. */
-const WORKER_URL = "https://house-radar-gate.gonzalomartinezberzal.workers.dev"; // set after deploying the Worker
+const WORKER_URL = "https://house-radar-gate.gonzalogmb.workers.dev";
 const GH_OAUTH_CLIENT_ID = "Iv23li70wXElgGvynH3v"; // must match cf-worker/wrangler.toml
 const SESSION_KEY = "hr-gh-session";
 const OAUTH_STATE_KEY = "hr-gh-oauth-state";
