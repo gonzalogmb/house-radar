@@ -3,13 +3,42 @@
     "name": "Madrid capital",
     "criteria": {
       "location_name": "Madrid capital",
-      "location_slugs": { "fotocasa": "madrid-capital", "pisos": "madrid_capital" },
+      "location_slugs": {
+        "fotocasa": "madrid-capital",
+        "pisos": "madrid_capital"
+      },
       "center": "40.4168,-3.7038",
       "operation": "venta",
-      "portals": ["fotocasa", "pisos"],
+      "portals": [
+        "fotocasa",
+        "pisos"
+      ],
       "max_price": 500000,
       "min_rooms": 1,
       "max_pages": 3
+    }
+  },
+  {
+    "name": "Madrid < 700k",
+    "criteria": {
+      "location_name": "Madrid capital",
+      "location_slugs": {
+        "idealista": "madrid-madrid",
+        "fotocasa": "madrid-capital",
+        "pisos": "madrid_capital"
+      },
+      "center": "40.4168,-3.7038",
+      "operation": "venta",
+      "portals": [
+        "idealista",
+        "fotocasa",
+        "pisos"
+      ],
+      "min_price": null,
+      "max_price": 700000,
+      "min_rooms": null,
+      "min_surface": null,
+      "max_pages": 10
     }
   }
 ]
