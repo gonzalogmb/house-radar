@@ -356,6 +356,7 @@ function renderKpis() {
     { value: num(d.new_listings), label: "nuevos en la última pasada", cls: "accent" },
     { value: num(d.price_drops), label: "con bajada de precio", cls: "ok" },
     { value: num(d.sareb_listings), label: "de la Sareb", cls: "sareb" },
+    { value: num(d.bargains), label: "chollos (≥15% bajo su barrio)", cls: "bargain" },
     { value: euro(d.median_price), label: "precio mediano" },
     { value: d.median_price_per_m2 ? `${num(d.median_price_per_m2)} €/m²` : "—", label: "mediana por m²" },
     { value: relative(d.last_scrape), label: "última captura" },
@@ -391,6 +392,7 @@ function listingCard(item) {
   if (item.price_delta < 0) badges.push(`<span class="badge drop">↓ ${euro(Math.abs(item.price_delta))}</span>`);
   if (item.price_delta > 0) badges.push(`<span class="badge rise">↑ ${euro(item.price_delta)}</span>`);
   if (item.is_sareb) badges.push('<span class="badge sareb">🏦 Sareb</span>');
+  if (item.is_bargain) badges.push(`<span class="badge bargain">💰 ${item.price_vs_median_pct}% vs. barrio</span>`);
 
   const zone = [item.neighborhood, item.district, item.city].filter(Boolean)[0];
   const floor = floorLabel(item.floor);
@@ -446,6 +448,7 @@ function renderListings() {
   if (state.quick === "new") items = items.filter((i) => i.is_new);
   if (state.quick === "drops") items = items.filter((i) => i.price_delta < 0);
   if (state.quick === "sareb") items = items.filter((i) => i.is_sareb);
+  if (state.quick === "bargain") items = items.filter((i) => i.is_bargain);
 
   const matched = items.length;
   items.sort((a, b) => {

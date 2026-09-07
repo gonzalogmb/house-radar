@@ -15,6 +15,12 @@ logger = logging.getLogger(__name__)
 
 _file_lock = Lock()
 
+# A neighbourhood's own median needs enough listings to mean anything; below this,
+# fall back silently happens via the district/city grouping in enrich_history().
+MIN_AREA_COMPARABLES = 3
+# How far below the area's median €/m² a listing has to be to get flagged a bargain.
+BARGAIN_THRESHOLD_PCT = -15
+
 LISTING_COLUMNS = [
     "portal",
     "listing_id",
@@ -150,6 +156,20 @@ def enrich_history(history: pd.DataFrame, search_id: str | None = None) -> pd.Da
     last_pass = frame["scraped_at"].max()
     frame["is_new"] = frame["first_seen"].dt.date == last_pass.date()
     frame["is_sareb"] = frame["advertiser_name"].apply(is_sareb_related)
+
+    # Absolute price says nothing on its own — a portal search can't tell you whether
+    # 3.500 €/m² is a steal or a rip-off without comparing it to what else is on offer
+    # in the same area right now. Fall back to district/city when the neighbourhood
+    # itself doesn't have enough comparables to trust a median.
+    area = frame["neighborhood"].fillna(frame["district"]).fillna(frame["city"])
+    frame["area_comparables"] = frame.groupby(area)["price_per_m2"].transform("count")
+    frame["area_median_ppm2"] = frame.groupby(area)["price_per_m2"].transform("median").round(0)
+    frame["price_vs_median_pct"] = (
+        (frame["price_per_m2"] - frame["area_median_ppm2"]) / frame["area_median_ppm2"] * 100
+    ).round(1)
+    frame["is_bargain"] = (frame["area_comparables"] >= MIN_AREA_COMPARABLES) & (
+        frame["price_vs_median_pct"] <= BARGAIN_THRESHOLD_PCT
+    )
 
     if search_id:
         frame = frame[frame["search_id"] == search_id]

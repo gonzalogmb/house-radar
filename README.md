@@ -204,6 +204,13 @@ diario programado no se ve afectado: corre igual, lo dispares tú o no.
   lo que ya se scrapea de Fotocasa/pisos.com, no un portal nuevo: la Sareb no vende
   directamente (su web tiene hCaptcha) y esas gestoras también gestionan activos de
   otros propietarios, así que es una señal fuerte, no una certeza.
+  El distintivo **💰 Chollos** compara el €/m² de cada anuncio contra la mediana de su
+  propio barrio (no de la ciudad entera) — algo que ningún portal individual te da,
+  porque no comparan entre sí. Necesita al menos 3 anuncios comparables en la zona
+  (si no, cae al distrito o ciudad) y marca los que están un 15% o más por debajo; el
+  porcentaje exacto se ve en el propio distintivo, y también se puede ordenar por
+  "Mejor precio vs. barrio". Los umbrales (`MIN_AREA_COMPARABLES`,
+  `BARGAIN_THRESHOLD_PCT`) están en `app/storage.py`, junto a `enrich_history()`.
 - **Ejecuciones**: estado en vivo de cada run, anuncios nuevos, bajadas de precio, y qué
   falló en cada portal.
 

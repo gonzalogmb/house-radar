@@ -16,6 +16,8 @@
   --danger-soft: rgba(248, 113, 113, 0.14);
   --sareb: #a78bfa;
   --sareb-soft: rgba(167, 139, 250, 0.16);
+  --bargain: #2dd4bf;
+  --bargain-soft: rgba(45, 212, 191, 0.16);
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 24px rgba(0, 0, 0, 0.28);
   --radius: 14px;
   color-scheme: dark;
@@ -39,6 +41,8 @@
   --danger-soft: rgba(217, 58, 58, 0.1);
   --sareb: #7c3aed;
   --sareb-soft: rgba(124, 58, 237, 0.1);
+  --bargain: #0d9488;
+  --bargain-soft: rgba(13, 148, 136, 0.1);
   --shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.06);
   color-scheme: light;
 }
@@ -222,6 +226,7 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .kpi.accent .kpi-value { color: var(--accent); }
 .kpi.ok .kpi-value { color: var(--ok); }
 .kpi.sareb .kpi-value { color: var(--sareb); }
+.kpi.bargain .kpi-value { color: var(--bargain); }
 
 .two-col { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
 @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
@@ -425,6 +430,7 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .badge.drop { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
 .badge.rise { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
 .badge.sareb { background: var(--sareb-soft); border-color: var(--sareb); color: var(--sareb); }
+.badge.bargain { background: var(--bargain-soft); border-color: var(--bargain); color: var(--bargain); }
 .badge.done { background: var(--ok-soft); border-color: var(--ok); color: var(--ok); }
 .badge.running, .badge.pending { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
 .badge.failed { background: var(--danger-soft); border-color: var(--danger); color: var(--danger); }
@@ -440,6 +446,7 @@ main { padding: 20px 24px 56px; max-width: 1420px; margin: 0 auto; }
 .listing-media .badge.drop { background: rgba(16, 160, 110, 0.94); border-color: transparent; color: #fff; }
 .listing-media .badge.rise { background: rgba(190, 130, 10, 0.94); border-color: transparent; color: #fff; }
 .listing-media .badge.sareb { background: rgba(124, 58, 237, 0.94); border-color: transparent; color: #fff; }
+.listing-media .badge.bargain { background: rgba(13, 148, 136, 0.94); border-color: transparent; color: #fff; }
 
 .listing-body { padding: 14px 15px 15px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 .price-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
