@@ -4,12 +4,16 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>House Radar</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700&family=Manrope:wght@400;500;600;700&display=swap" />
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
     <header class="topbar">
       <div class="brand">
-        <span class="brand-mark">◎</span>
+        <span class="brand-mark">
+          <svg class="icon" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 17.3 7.9"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/></svg>
+        </span>
         <div>
           <h1>House Radar</h1>
           <p id="meta-line" class="muted tiny">cargando…</p>
@@ -21,14 +25,16 @@
           <button class="seg" data-tab="listings" role="tab">Resultados</button>
           <button class="seg" data-tab="runs" role="tab">Ejecuciones</button>
         </nav>
-        <button id="theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">☾</button>
+        <button id="theme-toggle" class="icon-btn" title="Cambiar tema" aria-label="Cambiar tema">
+          <svg class="icon" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        </button>
       </div>
     </header>
 
     <section id="kpis" class="kpis"></section>
 
     <div id="demo-banner" class="demo-banner hidden">
-      <span>🔒 Demo pública de solo lectura — puedes explorar los datos, pero lanzar o guardar búsquedas está desactivado aquí.</span>
+      <span><svg class="icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg> Demo pública de solo lectura — puedes explorar los datos, pero lanzar o guardar búsquedas está desactivado aquí.</span>
       <a href="https://github.com/gonzalogmb/house-radar" target="_blank" rel="noopener">Córrelo tú mismo en GitHub →</a>
     </div>
 
@@ -113,10 +119,10 @@
         <div class="toolbar">
           <div class="chips" id="quick-filters">
             <button class="chip" data-quick="all" aria-pressed="true">Todos</button>
-            <button class="chip" data-quick="new" aria-pressed="false">✦ Nuevos</button>
-            <button class="chip" data-quick="drops" aria-pressed="false">↓ Bajadas</button>
-            <button class="chip" data-quick="sareb" aria-pressed="false">🏦 Sareb</button>
-            <button class="chip" data-quick="bargain" aria-pressed="false">💰 Chollos</button>
+            <button class="chip" data-quick="new" aria-pressed="false"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg> Nuevos</button>
+            <button class="chip" data-quick="drops" aria-pressed="false"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 7 9.5 13.5 13.5 9.5 21 18"/><polyline points="21 12 21 18 15 18"/></svg> Bajadas</button>
+            <button class="chip" data-quick="sareb" aria-pressed="false"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 10 12 4l9 6"/><path d="M4 10v9M9.5 10v9M14.5 10v9M20 10v9"/><path d="M2 21h20"/></svg> Sareb</button>
+            <button class="chip" data-quick="bargain" aria-pressed="false"><svg class="icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.6 12.3 12.7 20.2a2 2 0 0 1-2.8 0l-6-6a2 2 0 0 1 0-2.8L11.7 3.4A2 2 0 0 1 13.1 2.8L19 3a1 1 0 0 1 1 1l.2 5.9a2 2 0 0 1-.6 1.4z"/><circle cx="15.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/></svg> Chollos</button>
           </div>
           <div class="toolbar-fields">
             <div class="field inline wide">
@@ -157,7 +163,7 @@
                 <option value="price_vs_median_pct">Mejor precio vs. barrio</option>
               </select>
             </label>
-            <button id="sort-dir" class="icon-btn" title="Invertir orden">↓</button>
+            <button id="sort-dir" class="icon-btn" title="Invertir orden"><svg class="icon sort-arrow" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/></svg></button>
           </div>
         </div>
 
@@ -181,7 +187,7 @@
       <div class="modal-card">
         <div class="modal-head">
           <h3 id="modal-title">Histórico de precio</h3>
-          <button id="modal-close" class="icon-btn">✕</button>
+          <button id="modal-close" class="icon-btn"><svg class="icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
         </div>
         <div id="modal-body"></div>
       </div>

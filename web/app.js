@@ -23,6 +23,33 @@ const relative = (iso) => {
 const escapeHtml = (value) =>
   String(value ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
+/* ── Icons (small inline SVGs, no emoji) ─────────────────── */
+const ICON_PATHS = {
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>',
+  moon: '<path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>',
+  plusCircle: '<circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/>',
+  bank: '<path d="M3 10 12 4l9 6"/><path d="M4 10v9M9.5 10v9M14.5 10v9M20 10v9"/><path d="M2 21h20"/>',
+  tag: '<path d="M20.6 12.3 12.7 20.2a2 2 0 0 1-2.8 0l-6-6a2 2 0 0 1 0-2.8L11.7 3.4A2 2 0 0 1 13.1 2.8L19 3a1 1 0 0 1 1 1l.2 5.9a2 2 0 0 1-.6 1.4z"/><circle cx="15.5" cy="7.5" r="1.4" fill="currentColor" stroke="none"/>',
+  house: '<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-3.8-3.8"/>',
+  alertTriangle: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h16.9a2 2 0 0 0 1.7-3L13.6 3.9a2 2 0 0 0-3.3 0z"/><path d="M12 9v4M12 17h.01"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/>',
+  pin: '<path d="M12 22s7-7.4 7-12.5A7 7 0 0 0 5 9.5C5 14.6 12 22 12 22z"/><circle cx="12" cy="9.5" r="2.3"/>',
+  trendingUp: '<polyline points="3 17 9.5 10.5 13.5 14.5 21 6"/><polyline points="21 12 21 6 15 6"/>',
+  trendingDown: '<polyline points="3 7 9.5 13.5 13.5 9.5 21 18"/><polyline points="21 12 21 18 15 18"/>',
+  arrowDown: '<path d="M12 5v14"/><path d="M19 12l-7 7-7-7"/>',
+  x: '<path d="M18 6 6 18M6 6l12 12"/>',
+  radar: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><path d="M12 12 17.3 7.9"/><circle cx="12" cy="12" r="1.3" fill="currentColor" stroke="none"/>',
+};
+
+function icon(name, size = 14) {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICON_PATHS[name]}</svg>`;
+}
+
+function noPhotoHtml() {
+  return `<div class="no-photo">${icon("house", 28)}</div>`;
+}
+
 const state = { meta: {}, quick: "all", ascending: false, operation: "venta", portals: [] };
 let pollTimer = null;
 
@@ -133,7 +160,7 @@ function toast(message, kind = "") {
 /* ── Theme ──────────────────────────────────────────────── */
 function applyTheme(theme) {
   document.documentElement.dataset.theme = theme;
-  el("theme-toggle").textContent = theme === "light" ? "☀" : "☾";
+  el("theme-toggle").innerHTML = theme === "light" ? icon("sun", 16) : icon("moon", 16);
   try {
     localStorage.setItem("hr-theme", theme);
   } catch {
@@ -141,9 +168,9 @@ function applyTheme(theme) {
   }
 }
 
-let storedTheme = "dark";
+let storedTheme = "light";
 try {
-  storedTheme = localStorage.getItem("hr-theme") || (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  storedTheme = localStorage.getItem("hr-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
 } catch {
   /* ignore */
 }
@@ -275,7 +302,7 @@ async function renderSearches() {
   const searches = await api("/api/searches");
   const container = el("searches-list");
   if (!searches.length) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">🔍</div>
+    container.innerHTML = `<div class="empty"><div class="empty-icon">${icon("search", 26)}</div>
       <div class="empty-title">Sin búsquedas guardadas</div>
       <div class="tiny">Rellena el formulario y guárdala: entrará en el run diario.</div></div>`;
     return;
@@ -341,7 +368,7 @@ el("quick-filters").addEventListener("click", (event) => {
 
 el("sort-dir").addEventListener("click", () => {
   state.ascending = !state.ascending;
-  el("sort-dir").textContent = state.ascending ? "↑" : "↓";
+  el("sort-dir").classList.toggle("asc", state.ascending);
   renderListings();
 });
 
@@ -374,17 +401,17 @@ function floorLabel(floor) {
 
 function listingCard(item) {
   const badges = [];
-  if (item.is_new) badges.push('<span class="badge new">✦ Nuevo</span>');
-  if (item.price_delta < 0) badges.push(`<span class="badge drop">↓ ${euro(Math.abs(item.price_delta))}</span>`);
-  if (item.price_delta > 0) badges.push(`<span class="badge rise">↑ ${euro(item.price_delta)}</span>`);
-  if (item.is_sareb) badges.push('<span class="badge sareb">🏦 Sareb</span>');
-  if (item.is_bargain) badges.push(`<span class="badge bargain">💰 ${item.price_vs_median_pct}% vs. barrio</span>`);
+  if (item.is_new) badges.push(`<span class="badge new">${icon("plusCircle", 12)}Nuevo</span>`);
+  if (item.price_delta < 0) badges.push(`<span class="badge drop">${icon("trendingDown", 12)}${euro(Math.abs(item.price_delta))}</span>`);
+  if (item.price_delta > 0) badges.push(`<span class="badge rise">${icon("trendingUp", 12)}${euro(item.price_delta)}</span>`);
+  if (item.is_sareb) badges.push(`<span class="badge sareb">${icon("bank", 12)}Sareb</span>`);
+  if (item.is_bargain) badges.push(`<span class="badge bargain">${icon("tag", 12)}${item.price_vs_median_pct}% vs. barrio</span>`);
 
   const zone = [item.neighborhood, item.district, item.city].filter(Boolean)[0];
   const floor = floorLabel(item.floor);
   const media = item.thumbnail
-    ? `<img src="${escapeHtml(item.thumbnail)}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'no-photo',textContent:'🏠'}))" />`
-    : '<div class="no-photo">🏠</div>';
+    ? `<img data-thumb src="${escapeHtml(item.thumbnail)}" alt="" loading="lazy" />`
+    : noPhotoHtml();
 
   return `<article class="listing">
     <div class="listing-media">
@@ -406,7 +433,7 @@ function listingCard(item) {
         ${item.surface_m2 ? `<span><b>${num(item.surface_m2)}</b> m²</span>` : ""}
         ${floor ? `<span>${escapeHtml(floor)}</span>` : ""}
       </div>
-      ${zone ? `<div class="specs">📍 ${escapeHtml(zone)}</div>` : ""}
+      ${zone ? `<div class="specs">${icon("pin", 12)}${escapeHtml(zone)}</div>` : ""}
       <div class="listing-foot">
         <span>${escapeHtml((item.advertiser_name ?? item.advertiser_type ?? "").slice(0, 26)) || "—"}</span>
         <button class="link-btn" data-history="${item.portal}|${item.listing_id}">
@@ -443,7 +470,7 @@ async function renderListings() {
 
   if (!data.items.length) {
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
-      <div class="empty-icon">🏚️</div>
+      <div class="empty-icon">${icon("search", 26)}</div>
       <div class="empty-title">${data.total ? "Ningún anuncio pasa el filtro" : "Todavía no hay datos"}</div>
       <div class="tiny">${data.total ? "Prueba a relajar los filtros." : "Lanza una búsqueda desde la pestaña Búsquedas."}</div>
     </div>`;
@@ -453,6 +480,9 @@ async function renderListings() {
   grid.innerHTML = data.items.map(listingCard).join("");
   grid.querySelectorAll("[data-history]").forEach((button) =>
     button.addEventListener("click", () => showHistory(...button.dataset.history.split("|"))),
+  );
+  grid.querySelectorAll("[data-thumb]").forEach((img) =>
+    img.addEventListener("error", () => { img.outerHTML = noPhotoHtml(); }, { once: true }),
   );
 }
 
@@ -493,7 +523,7 @@ async function renderRuns() {
   const runs = await api("/api/runs?limit=25");
   const container = el("runs-list");
   if (!runs.length) {
-    container.innerHTML = `<div class="empty"><div class="empty-icon">⏱️</div>
+    container.innerHTML = `<div class="empty"><div class="empty-icon">${icon("clock", 26)}</div>
       <div class="empty-title">Nada ejecutado todavía</div>
       <div class="tiny">Lanza una búsqueda para ver aquí su traza.</div></div>`;
     return;
