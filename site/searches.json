@@ -5,13 +5,15 @@
       "location_name": "Madrid capital",
       "location_slugs": {
         "fotocasa": "madrid-capital",
-        "pisos": "madrid_capital"
+        "pisos": "madrid_capital",
+        "servihabitat": "madrid"
       },
       "center": "40.4168,-3.7038",
       "operation": "venta",
       "portals": [
         "fotocasa",
-        "pisos"
+        "pisos",
+        "servihabitat"
       ],
       "max_price": 500000,
       "min_rooms": 1,
@@ -23,16 +25,16 @@
     "criteria": {
       "location_name": "Madrid capital",
       "location_slugs": {
-        "idealista": "madrid-madrid",
         "fotocasa": "madrid-capital",
-        "pisos": "madrid_capital"
+        "pisos": "madrid_capital",
+        "servihabitat": "madrid"
       },
       "center": "40.4168,-3.7038",
       "operation": "venta",
       "portals": [
-        "idealista",
         "fotocasa",
-        "pisos"
+        "pisos",
+        "servihabitat"
       ],
       "min_price": null,
       "max_price": 700000,

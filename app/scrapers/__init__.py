@@ -4,8 +4,9 @@ from app.scrapers.fotocasa import FotocasaScraper
 from app.scrapers.idealista import IdealistaScraper
 from app.scrapers.idealista_api import IdealistaApiScraper
 from app.scrapers.pisos import PisosScraper
+from app.scrapers.servihabitat import ServihabitatScraper
 
-PORTALS = ("idealista", "fotocasa", "pisos")
+PORTALS = ("idealista", "fotocasa", "pisos", "servihabitat")
 
 
 def scraper_for(portal: str) -> type[Scraper] | None:
@@ -17,6 +18,8 @@ def scraper_for(portal: str) -> type[Scraper] | None:
         return FotocasaScraper
     if portal == "pisos":
         return PisosScraper
+    if portal == "servihabitat":
+        return ServihabitatScraper
     return None
 
 
@@ -28,5 +31,6 @@ __all__ = [
     "IdealistaScraper",
     "PisosScraper",
     "Scraper",
+    "ServihabitatScraper",
     "scraper_for",
 ]

@@ -58,31 +58,56 @@ function toast(message, kind = "") {
    Keep in sync by hand: there is no backend here to serve it fresh. ── */
 const CATALOGUE = {
   "Madrid capital": {
-    slugs: { idealista: "madrid-madrid", fotocasa: "madrid-capital", pisos: "madrid_capital" },
+    slugs: { idealista: "madrid-madrid", fotocasa: "madrid-capital", pisos: "madrid_capital", servihabitat: "madrid" },
     center: "40.4168,-3.7038",
   },
   "Barcelona capital": {
-    slugs: { idealista: "barcelona-barcelona", fotocasa: "barcelona-capital", pisos: "barcelona_capital" },
+    slugs: {
+      idealista: "barcelona-barcelona",
+      fotocasa: "barcelona-capital",
+      pisos: "barcelona_capital",
+      servihabitat: "barcelona",
+    },
     center: "41.3874,2.1686",
   },
   "Valencia capital": {
-    slugs: { idealista: "valencia-valencia", fotocasa: "valencia-capital", pisos: "valencia_capital" },
+    slugs: {
+      idealista: "valencia-valencia",
+      fotocasa: "valencia-capital",
+      pisos: "valencia_capital",
+      servihabitat: "valencia",
+    },
     center: "39.4699,-0.3763",
   },
   "Sevilla capital": {
-    slugs: { idealista: "sevilla-sevilla", fotocasa: "sevilla-capital", pisos: "sevilla_capital" },
+    slugs: {
+      idealista: "sevilla-sevilla",
+      fotocasa: "sevilla-capital",
+      pisos: "sevilla_capital",
+      servihabitat: "sevilla",
+    },
     center: "37.3891,-5.9845",
   },
   "Zaragoza capital": {
-    slugs: { idealista: "zaragoza-zaragoza", fotocasa: "zaragoza-capital", pisos: "zaragoza_capital" },
+    slugs: {
+      idealista: "zaragoza-zaragoza",
+      fotocasa: "zaragoza-capital",
+      pisos: "zaragoza_capital",
+      servihabitat: "zaragoza",
+    },
     center: "41.6488,-0.8891",
   },
   "Málaga capital": {
-    slugs: { idealista: "malaga-malaga", fotocasa: "malaga-capital", pisos: "malaga_capital" },
+    slugs: {
+      idealista: "malaga-malaga",
+      fotocasa: "malaga-capital",
+      pisos: "malaga_capital",
+      servihabitat: "malaga",
+    },
     center: "36.7213,-4.4214",
   },
 };
-const PORTALS = ["idealista", "fotocasa", "pisos"];
+const PORTALS = ["idealista", "fotocasa", "pisos", "servihabitat"];
 
 /* ── GitHub as the backend for reads ─────────────────────────────────────
    Browsing (Resultados, Ejecuciones, the list of saved searches) only ever

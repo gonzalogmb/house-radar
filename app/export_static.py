@@ -20,7 +20,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from app.models import Listing, PortalResult, SearchCriteria
+from app.models import Listing, PortalResult, RunStatus, SearchCriteria
 from app.scrapers import scraper_for
 from app.storage import (
     LISTING_COLUMNS,
@@ -59,7 +59,12 @@ async def scrape_all(searches: list[dict]) -> tuple[list[Listing], list[PortalRe
             if not scraper.supports(criteria):
                 logger.warning("%s: skipping %s, search lacks the data it needs", search["name"], portal)
                 continue
-            portal_listings, result = await scraper.scrape(criteria)
+            try:
+                portal_listings, result = await scraper.scrape(criteria)
+            except Exception as exc:  # noqa: BLE001 - one broken portal must not sink the whole export
+                logger.exception("%s/%s crashed", search["name"], portal)
+                results.append(PortalResult(portal=portal, status=RunStatus.failed, error=str(exc)))
+                continue
             logger.info(
                 "%s/%s: %s listings, status=%s%s",
                 search["name"],

@@ -20,6 +20,12 @@ _file_lock = Lock()
 MIN_AREA_COMPARABLES = 3
 # How far below the area's median €/m² a listing has to be to get flagged a bargain.
 BARGAIN_THRESHOLD_PCT = -15
+# A listing that stops showing up in fresh scrapes has most likely been sold, rented,
+# or taken down — without this, enrich_history() would keep it forever (nothing ever
+# re-checks whether an old listing_id is still live), slowly filling the demo with
+# dead listings. A few days of slack tolerates a portal being skipped for a run or two
+# without listings flickering in and out.
+STALE_AFTER_DAYS = 3
 
 LISTING_COLUMNS = [
     "portal",
@@ -154,6 +160,7 @@ def enrich_history(history: pd.DataFrame, search_id: str | None = None) -> pd.Da
     frame["price_delta"] = frame["price"] - frame["previous_snapshot_price"]
 
     last_pass = frame["scraped_at"].max()
+    frame = frame[frame["scraped_at"] >= last_pass - pd.Timedelta(days=STALE_AFTER_DAYS)].reset_index(drop=True)
     frame["is_new"] = frame["first_seen"].dt.date == last_pass.date()
     frame["is_sareb"] = frame["advertiser_name"].apply(is_sareb_related)
 

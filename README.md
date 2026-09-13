@@ -16,6 +16,7 @@ web (HTML/JS)  ->  FastAPI  ->  scrapers  ->  data/raw/*.html.gz   (payload ínt
 | **pisos.com** | HTTP + `BeautifulSoup` | Funciona, sin muro anti-bot detectado. Los filtros son segmentos de ruta en un orden fijo (`con-N-habitaciones`, `desde-N-m2`, `desde-N`, `hasta-N`) que el servidor reordena solo con un 301 si se los pasas en otro orden; no soporta fecha de publicación en el listado (se excluye de la cobertura de campos, no es una rotura). |
 | **idealista** | API oficial (`IdealistaApiScraper`) | Requiere clave. Su web pública está tras **DataDome** y responde `403` a cualquier cliente automatizado — comprobado con Chromium y Chrome reales, headless y con ventana. No se intenta evadir el muro. |
 | idealista | HTML (`IdealistaScraper`) | Fallback sin clave: el parser es correcto y está probado, pero devolverá el error del muro anti-bot en vez de fingir que funcionó. |
+| **servihabitat** | HTTP + `BeautifulSoup` | Funciona, sin muro anti-bot. Es una de las gestoras de activos de la Sareb (ver [`app/advertiser_tags.py`](app/advertiser_tags.py)), así que cada anuncio se etiqueta `is_sareb=true` directamente, sin adivinar por el nombre del anunciante. Dos límites propios: su URL solo admite un slug de **provincia** (no de municipio, cubre más que solo la capital) y no tiene paginación por enlace/parámetro — cada scrape trae la primera página (~20-30 anuncios) de cada provincia, no el total real (visible en `PortalResult.total_reported`). Los precios/habitaciones/superficie de la búsqueda se filtran aquí en el propio scraper, no en la URL del portal. |
 
 Para activar idealista, pide una clave gratuita en <https://www.idealista.com/labs/> y
 define `HR_IDEALISTA_API_KEY` / `HR_IDEALISTA_API_SECRET`. El plan gratuito ronda las
@@ -200,10 +201,11 @@ diario programado no se ve afectado: corre igual, lo dispares tú o no.
   selección múltiple). Al pulsar en el pie de una tarjeta se abre su histórico de precio.
   El distintivo **🏦 Sareb** marca los anuncios cuyo anunciante coincide con una gestora
   conocida del banco malo (Hipoges, Aliseda, Servihabitat, Aelca...) — ver
-  [`app/advertiser_tags.py`](app/advertiser_tags.py). Es una coincidencia de texto sobre
-  lo que ya se scrapea de Fotocasa/pisos.com, no un portal nuevo: la Sareb no vende
-  directamente (su web tiene hCaptcha) y esas gestoras también gestionan activos de
-  otros propietarios, así que es una señal fuerte, no una certeza.
+  [`app/advertiser_tags.py`](app/advertiser_tags.py). Para Fotocasa/pisos.com es una
+  coincidencia de texto sobre lo que ya se scrapea (la Sareb no vende directamente, su
+  web tiene hCaptcha, y esas gestoras también gestionan activos de otros propietarios,
+  así que es una señal fuerte, no una certeza); el portal **servihabitat** en cambio se
+  marca siempre como Sareb, sin adivinar nada, porque es la propia web de la gestora.
   El distintivo **💰 Chollos** compara el €/m² de cada anuncio contra la mediana de su
   propio barrio (no de la ciudad entera) — algo que ningún portal individual te da,
   porque no comparan entre sí. Necesita al menos 3 anuncios comparables en la zona
@@ -211,8 +213,12 @@ diario programado no se ve afectado: corre igual, lo dispares tú o no.
   porcentaje exacto se ve en el propio distintivo, y también se puede ordenar por
   "Mejor precio vs. barrio". Los umbrales (`MIN_AREA_COMPARABLES`,
   `BARGAIN_THRESHOLD_PCT`) están en `app/storage.py`, junto a `enrich_history()`.
+  Un anuncio que deja de salir en los scrapes (vendido, retirado...) desaparece solo de
+  resultados y KPIs pasados `STALE_AFTER_DAYS` días sin volver a verse — no hace falta
+  borrarlo a mano, y su histórico de precio sigue intacto en `history.parquet`/`data/`.
 - **Ejecuciones**: estado en vivo de cada run, anuncios nuevos, bajadas de precio, y qué
-  falló en cada portal.
+  falló en cada portal — un portal roto (selector cambiado, bloqueo, excepción) se marca
+  como fallido sin tirar abajo los demás ni el resto de búsquedas.
 
 Un run diario a la hora de `HR_DAILY_RUN_HOUR` lanza todas las búsquedas guardadas
 (APScheduler dentro del proceso; `HR_DAILY_RUN_HOUR=-1` lo desactiva).
