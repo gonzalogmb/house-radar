@@ -388,7 +388,70 @@ function floorLabel(floor) {
 }
 
 /* ── Data (Resultados tab) ──────────────────────────────────────────── */
-const state = { data: null, quick: "all", ascending: false, operation: "venta" };
+const state = { data: null, quick: "all", ascending: false, operation: "venta", view: "grid" };
+
+/* ── Map view (Leaflet, OpenStreetMap tiles — no API key) ────────────── */
+let map = null;
+let markerLayer = null;
+
+function ensureMap() {
+  if (map) return map;
+  map = L.map("listings-map", { scrollWheelZoom: true }).setView([40.4168, -3.7038], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+  }).addTo(map);
+  markerLayer = L.markerClusterGroup({ maxClusterRadius: 45 });
+  markerLayer.addTo(map);
+  return map;
+}
+
+function mapPopupHtml(item) {
+  const zone = [item.neighborhood, item.district, item.city].filter(Boolean)[0];
+  return `<div class="map-popup">
+    ${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="" loading="lazy" />` : ""}
+    <div class="price-row">
+      <span class="price">${euro(item.price)}</span>
+      ${item.price_per_m2 ? `<span class="ppm">${num(item.price_per_m2)} €/m²</span>` : ""}
+    </div>
+    <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title ?? item.listing_id)}</a>
+    <div class="specs">
+      ${item.rooms ? `${item.rooms} hab · ` : ""}${item.surface_m2 ? `${num(item.surface_m2)} m²` : ""}
+    </div>
+    ${zone ? `<div class="specs">${escapeHtml(zone)}</div>` : ""}
+  </div>`;
+}
+
+function renderMap(items) {
+  ensureMap();
+  requestAnimationFrame(() => map.invalidateSize());
+
+  const withCoords = items.filter((i) => i.latitude != null && i.longitude != null);
+  markerLayer.clearLayers();
+  withCoords.forEach((item) => {
+    L.marker([item.latitude, item.longitude]).bindPopup(mapPopupHtml(item)).addTo(markerLayer);
+  });
+
+  const note = el("map-note");
+  note.classList.remove("hidden");
+  note.textContent = items.length
+    ? `${nf.format(withCoords.length)} de ${nf.format(items.length)} anuncios tienen ubicación exacta (por ahora solo Fotocasa la da) y se ven en el mapa.`
+    : "";
+
+  if (withCoords.length) {
+    map.fitBounds(withCoords.map((i) => [i.latitude, i.longitude]), { padding: [30, 30], maxZoom: 16 });
+  }
+}
+
+el("view-toggle").addEventListener("click", (event) => {
+  const button = event.target.closest(".seg");
+  if (!button || button.classList.contains("active")) return;
+  state.view = button.dataset.view;
+  el("view-toggle")
+    .querySelectorAll(".seg")
+    .forEach((seg) => seg.classList.toggle("active", seg === button));
+  renderListings();
+});
 
 async function loadData() {
   const response = await fetch("data.json", { cache: "no-store" });
@@ -513,9 +576,27 @@ function renderListings() {
     return av > bv ? 1 : av < bv ? -1 : 0;
   });
   if (!state.ascending) items.reverse();
-  items = items.slice(0, 200);
 
-  el("listings-count").textContent = total ? `${nf.format(matched)} de ${nf.format(total)} anuncios · mostrando ${items.length}` : "";
+  const shown = state.view === "map" ? items.length : Math.min(items.length, 200);
+  el("listings-count").textContent = total ? `${nf.format(matched)} de ${nf.format(total)} anuncios · mostrando ${nf.format(shown)}` : "";
+
+  if (state.view === "map") {
+    grid.classList.add("hidden");
+    el("listings-map").classList.remove("hidden");
+    if (!items.length) {
+      el("map-note").classList.remove("hidden");
+      el("map-note").textContent = total ? "Ningún anuncio pasa el filtro." : "Todavía no hay datos.";
+      if (map) markerLayer.clearLayers();
+      return;
+    }
+    renderMap(items);
+    return;
+  }
+
+  el("listings-map").classList.add("hidden");
+  el("map-note").classList.add("hidden");
+  grid.classList.remove("hidden");
+  items = items.slice(0, 200);
 
   if (!items.length) {
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">

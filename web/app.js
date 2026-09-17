@@ -50,8 +50,67 @@ function noPhotoHtml() {
   return `<div class="no-photo">${icon("house", 28)}</div>`;
 }
 
-const state = { meta: {}, quick: "all", ascending: false, operation: "venta", portals: [] };
+const state = { meta: {}, quick: "all", ascending: false, operation: "venta", portals: [], view: "grid" };
 let pollTimer = null;
+
+/* ── Map view (Leaflet, OpenStreetMap tiles — no API key) ────────────── */
+let map = null;
+let markerLayer = null;
+
+function ensureMap() {
+  if (map) return map;
+  map = L.map("listings-map", { scrollWheelZoom: true }).setView([40.4168, -3.7038], 12);
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>',
+  }).addTo(map);
+  markerLayer = L.markerClusterGroup({ maxClusterRadius: 45 });
+  markerLayer.addTo(map);
+  return map;
+}
+
+function mapPopupHtml(item) {
+  const zone = [item.neighborhood, item.district, item.city].filter(Boolean)[0];
+  return `<div class="map-popup">
+    ${item.thumbnail ? `<img src="${escapeHtml(item.thumbnail)}" alt="" loading="lazy" />` : ""}
+    <div class="price-row">
+      <span class="price">${euro(item.price)}</span>
+      ${item.price_per_m2 ? `<span class="ppm">${num(item.price_per_m2)} €/m²</span>` : ""}
+    </div>
+    <a href="${escapeHtml(item.url)}" target="_blank" rel="noopener">${escapeHtml(item.title ?? item.listing_id)}</a>
+    <div class="specs">
+      ${item.rooms ? `${item.rooms} hab · ` : ""}${item.surface_m2 ? `${num(item.surface_m2)} m²` : ""}
+    </div>
+    ${zone ? `<div class="specs">${escapeHtml(zone)}</div>` : ""}
+  </div>`;
+}
+
+function renderMap(items) {
+  ensureMap();
+  requestAnimationFrame(() => map.invalidateSize());
+
+  const withCoords = items.filter((i) => i.latitude != null && i.longitude != null);
+  markerLayer.clearLayers();
+  withCoords.forEach((item) => {
+    L.marker([item.latitude, item.longitude]).bindPopup(mapPopupHtml(item)).addTo(markerLayer);
+  });
+
+  const note = el("map-note");
+  note.classList.remove("hidden");
+  note.textContent = items.length
+    ? `${nf.format(withCoords.length)} de ${nf.format(items.length)} anuncios tienen ubicación exacta (por ahora solo Fotocasa la da) y se ven en el mapa.`
+    : "Ningún anuncio pasa el filtro.";
+}
+
+el("view-toggle").addEventListener("click", (event) => {
+  const button = event.target.closest(".seg");
+  if (!button || button.classList.contains("active")) return;
+  state.view = button.dataset.view;
+  el("view-toggle")
+    .querySelectorAll(".seg")
+    .forEach((seg) => seg.classList.toggle("active", seg === button));
+  renderListings();
+});
 
 /* ── Multi-select dropdown (grouped checkboxes, e.g. barrio by distrito) ── */
 function createMultiSelect(root, { emptyLabel, onChange }) {
@@ -446,9 +505,14 @@ function listingCard(item) {
 
 async function renderListings() {
   const grid = el("listings-grid");
-  grid.innerHTML = Array.from({ length: 6 }, () => '<div class="skeleton"></div>').join("");
+  const onMap = state.view === "map";
+  if (!onMap) grid.innerHTML = Array.from({ length: 6 }, () => '<div class="skeleton"></div>').join("");
 
-  const params = new URLSearchParams({ order_by: el("f-order").value, ascending: String(state.ascending) });
+  const params = new URLSearchParams({
+    order_by: el("f-order").value,
+    ascending: String(state.ascending),
+    limit: onMap ? "1000" : "200",
+  });
   const optional = {
     portal: el("f-portal").value,
     max_price: el("f-max-price").value,
@@ -467,6 +531,16 @@ async function renderListings() {
   el("listings-count").textContent = data.total
     ? `${nf.format(data.matched)} de ${nf.format(data.total)} anuncios · mostrando ${data.items.length}`
     : "";
+
+  if (onMap) {
+    grid.classList.add("hidden");
+    el("listings-map").classList.remove("hidden");
+    renderMap(data.items);
+    return;
+  }
+  el("listings-map").classList.add("hidden");
+  el("map-note").classList.add("hidden");
+  grid.classList.remove("hidden");
 
   if (!data.items.length) {
     grid.innerHTML = `<div class="empty" style="grid-column:1/-1">
